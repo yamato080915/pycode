@@ -11,8 +11,6 @@ from PIL import Image
 import threading
 from time import sleep
 
-import concurrent.futures
-
 from pygments.lexers import *
 
 import appdata
@@ -384,6 +382,7 @@ class txtedit(tk.Frame):
 		time_to_wait = max(1, int(1000/self.fps_limit - (perf_counter() - current_time)*1000)-self.timestack)
 		#print(self.fps, self.fps*0.7 <= self.fps_limit, self.timestack)
 		#sleep(time_to_wait)
+		
 		if self.xbar.get() == (0.0, 1.0):
 			if self.xbargrid:
 				self.xbar.grid_remove()
