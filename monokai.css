@@ -1,0 +1,140 @@
+/* Monokai Dark Theme */
+QMainWindow, QWidget {
+	background-color: #272822;
+	color: #f8f8f2;
+}
+
+QTextEdit {
+	background-color: #272822;
+	color: #f8f8f2;
+	border: 1px solid #3e3d32;
+	selection-background-color: #49483e;
+	selection-color: #f8f8f2;
+}
+
+QTreeView {
+	background-color: #1e1f1c;
+	color: #f8f8f2;
+	border: 1px solid #3e3d32;
+	selection-background-color: #49483e;
+	alternate-background-color: #232421;
+}
+
+QTreeView::item:hover {
+	background-color: #3e3d32;
+}
+
+QTreeView::item:selected {
+	background-color: #49483e;
+	color: #f8f8f2;
+}
+
+QTabWidget::pane {
+	background-color: #272822;
+	border: 1px solid #3e3d32;
+}
+
+QTabBar::tab {
+	background-color: #1e1f1c;
+	color: #75715e;
+	padding: 6px 12px;
+	border: 1px solid #3e3d32;
+	border-bottom: none;
+	margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+	background-color: #272822;
+	color: #f8f8f2;
+	border-bottom: 2px solid #66d9ef;
+}
+
+QTabBar::tab:hover:!selected {
+	background-color: #3e3d32;
+	color: #f8f8f2;
+}
+
+QMenuBar {
+	background-color: #1e1f1c;
+	color: #f8f8f2;
+	border-bottom: 1px solid #3e3d32;
+}
+
+QMenuBar::item:selected {
+	background-color: #49483e;
+}
+
+QMenu {
+	background-color: #272822;
+	color: #f8f8f2;
+	border: 1px solid #3e3d32;
+}
+
+QMenu::item:selected {
+	background-color: #49483e;
+}
+
+QMenu::separator {
+	height: 1px;
+	background-color: #3e3d32;
+	margin: 4px 0;
+}
+
+QStatusBar {
+	background-color: #1e1f1c;
+	color: #75715e;
+	border-top: 1px solid #3e3d32;
+}
+
+QSplitter::handle {
+	background-color: #3e3d32;
+}
+
+QSplitter::handle:horizontal {
+	width: 2px;
+}
+
+QSplitter::handle:vertical {
+	height: 2px;
+}
+
+QScrollBar:vertical {
+	background-color: #1e1f1c;
+	width: 12px;
+	border: none;
+}
+
+QScrollBar::handle:vertical {
+	background-color: #49483e;
+	min-height: 20px;
+	border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover {
+	background-color: #66d9ef;
+}
+
+QScrollBar:horizontal {
+	background-color: #1e1f1c;
+	height: 12px;
+	border: none;
+}
+
+QScrollBar::handle:horizontal {
+	background-color: #49483e;
+	min-width: 20px;
+	border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal:hover {
+	background-color: #66d9ef;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+	background: none;
+	border: none;
+}
+
+QScrollBar::add-page, QScrollBar::sub-page {
+	background: none;
+}
