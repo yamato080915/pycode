@@ -1,33 +1,20 @@
-import sys, importlib, json, os
+import sys, os, json
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QAction, QTextOption, QFontMetrics
 from PySide6.QtCore import Qt, QDir, QFileInfo, QSettings
 from terminal import Terminal
-from pygments.lexers import *
-from pygments import formatters
-import pygments
-
-with open(f"lexers.json", "r", encoding="utf-8") as temp:
-	lexers = json.load(temp)
+from syntaxhighlight import PygmentsSyntaxHighlight
 
 embedded_python = "python\\python.exe"
-
+STYLE = "themes/onedarkpro"
+with open(f"{STYLE}.json", "r", encoding="utf-8") as f:
+	STYLE = json.load(f)
+if not "theme" in STYLE:
+	STYLE["theme"] = "themes/monokai.css"
 class Window(QMainWindow):
 	def __init__(self):
 		super().__init__()
-		self.formatter = formatters.HtmlFormatter(
-			noclasses=True,
-			style="monokai",
-			prestyles=(
-				"margin:0;"
-				"padding:0;"
-				"line-height:normal;"
-				"white-space:pre;"
-				"font-family: Consolas;"
-				"font-size:11pt;"
-			)
-		)
-		self.setStyleSheet(open("monokai.css", "r", encoding="utf-8").read())
+		self.setStyleSheet(open(STYLE["theme"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
 		self.resize(800, 600)
 		
@@ -85,13 +72,6 @@ class Window(QMainWindow):
 
 		self.create_menu_bar()
 		self.create_status_bar()
-		
-		self.lexer_classes = {}
-		for extension, lexer_name in lexers.items():
-			module_name = "pygments.lexers"
-			module = importlib.import_module(module_name)
-			lexer_class = getattr(module, lexer_name)
-			self.lexer_classes[extension] = type(lexer_name, (lexer_class,), {"__module__": module_name})
 
 	def create_menu_bar(self):
 		menubar = self.menuBar()
@@ -202,41 +182,16 @@ class Window(QMainWindow):
 			self.tabfilelist.append(path)
 		else:
 			self.tabfilelist.append(None)
-		self.tablist.append(QTextEdit())
+		self.tablist.append(QPlainTextEdit())
 		self.tablist[-1].setFont(self.FONT)
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
+		PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		self.tablist[-1].document().setDefaultTextOption(options)
-		
-		self.tablist[-1].textChanged.connect(lambda: self.update_highlight(self.tablist[-1]))
 		
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
-
-	def highlight(self, file_path, content):
-		lexer_class = self.lexer_classes[os.path.splitext(file_path)[1]]()
-		result = pygments.highlight(content, lexer_class, self.formatter)
-		return lexer_class, result
-
-	def update_highlight(self, text_edit):
-		if not hasattr(text_edit, 'file_path'):
-			return
-		if not hasattr(text_edit, 'lexer'):
-			return
-		
-		cursor = text_edit.textCursor()
-		position = cursor.position()
-		
-		content = text_edit.toPlainText()
-		highlighted = pygments.highlight(content, text_edit.lexer, self.formatter)
-		
-		text_edit.blockSignals(True)
-		text_edit.setHtml(highlighted)
-		
-		cursor.setPosition(position)
-		text_edit.setTextCursor(cursor)
-		text_edit.blockSignals(False)
 
 	def open_(self, file_path):
 		try:
@@ -244,12 +199,7 @@ class Window(QMainWindow):
 				content = file.read()
 				self.newtab(path=file_path)
 				current_tab = self.tablist[-1]
-				if os.path.splitext(file_path)[1] in self.lexer_classes:
-					lexer_class, content = self.highlight(file_path, content)
-					current_tab.lexer = lexer_class
-					current_tab.setHtml(content)
-				else:
-					current_tab.setPlainText(content)
+				current_tab.setPlainText(content)
 				current_tab.file_path = file_path
 		except UnicodeDecodeError:
 			QMessageBox.warning(self, "警告", "このファイルはテキストファイルではないか、対応していないエンコーディングです。")

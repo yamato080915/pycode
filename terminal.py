@@ -1,11 +1,11 @@
 import sys, time, re
 from winpty import PtyProcess
 from threading import Thread
-from PySide6.QtWidgets import QApplication, QMainWindow, QTextEdit
+from PySide6.QtWidgets import QApplication, QMainWindow, QPlainTextEdit
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QDir, Qt, Signal
 
-class Terminal(QTextEdit):
+class Terminal(QPlainTextEdit):
 	output_received = Signal(tuple)
 	def __init__(self):
 		super().__init__()
@@ -62,7 +62,7 @@ class Terminal(QTextEdit):
 		return text
 
 	def append_output(self, text):
-		self.append(text.strip("\r\n"))
+		self.appendPlainText(text.strip("\r\n"))
 		self.prompt_position = self.textCursor().position()
 
 	def run_command(self):

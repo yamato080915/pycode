@@ -1,0 +1,31 @@
+{
+    "name": "One Dark Pro", 
+    "type": "theme",
+    "theme": "themes/onedarkpro.css",
+    "highlight": {
+        "Keyword": {"Foreground": "#C678DD"},
+        "Keyword.Constant": {"Foreground": "#E5C07B"},
+        "Keyword.Namespace": {"Foreground": "#C678DD"},
+        "Name": {"Foreground": "#E06C75"},
+        "Name.Builtin": {"Foreground": "#61AFEF"},
+        "Name.Builtin.Pseudo": {"Foreground": "#E5C07B"},
+        "Name.Class": {"Foreground": "#E5C07B"},
+        "Name.Exception": {"Foreground": "#E5C07B"},
+        "Name.Function": {"Foreground": "#61AFEF"},
+        "Name.Function.Magic": {"Foreground": "#56B6C2"},
+        "Name.Namespace": {"Foreground": "#E5C07B"},
+        "Name.Variable.Magic": {"Foreground": "#E06C75"},
+        "Operator": {"Foreground": "#56B6C2"},
+        "Operator.Word": {"Foreground": "#C678DD"},
+        "Literal.String.Double": {"Foreground": "#98C379"},
+        "Literal.String.Single": {"Foreground": "#98C379"},
+        "Literal.String.Escape": {"Foreground": "#56B6C2"},
+        "Literal.String.Interpol": {"Foreground": "#7F848E"},
+        "Literal.String.Affix": {"Foreground": "#C678DD"},
+        "Literal.Number.Integer": {"Foreground": "#D19A66"},
+        "Literal.Number.Float": {"Foreground": "#D19A66"},
+        "Literal.String.Doc": {"Foreground": "#ABB2BF"},
+        "Punctuation": {"Foreground": "#ABB2BF"},
+        "Comment.Single": {"Foreground": "#ABB2BF"}
+    }
+}
