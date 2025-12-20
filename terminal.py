@@ -1,16 +1,24 @@
-import sys, time, re
-from winpty import PtyProcess
+import sys, time, re, platform, os
 from threading import Thread
 from PySide6.QtWidgets import QApplication, QMainWindow, QPlainTextEdit
 from PySide6.QtGui import QFont
 from PySide6.QtCore import QDir, Qt, Signal
 
+OS = platform.system()
+
+if OS == "Windows":
+	from winpty import PtyProcess
+else:
+	import pty, subprocess
+
 class Terminal(QPlainTextEdit):
 	output_received = Signal(tuple)
 	def __init__(self):
 		super().__init__()
-
-		self.setFont(QFont("Cascadia Mono", 11))
+		if OS == "Windows":
+			self.setFont(QFont("Cascadia Mono", 11))
+		else:
+			self.setFont(QFont("Monospace", 11))
 		
 		self.output_received.connect(self.append_output)
 		self.prompt_position = 0
@@ -26,29 +34,58 @@ class Terminal(QPlainTextEdit):
 		self.cmd_pattern = re.compile(r'\d+;C:\\WINDOWS\\system32\\cmd\.exe[^\n]*')
 
 	def start_terminal(self):
-		if hasattr(self, 'pty') and self.pty.isalive():
-			self.end_terminal()
 		self.cwd = QDir.currentPath()
-		self.pty = PtyProcess.spawn("cmd.exe", cwd=self.cwd, env=None)
+		if OS == "Windows":
+			if hasattr(self, 'pty') and self.pty.isalive():
+				self.end_terminal()
+			self.pty = PtyProcess.spawn("cmd.exe", cwd=self.cwd, env=None)
+		else:
+			self.master, self.slave = pty.openpty()
+			self.pty = subprocess.Popen(
+				["/bin/bash"], 
+				stdin=self.slave, 
+				stdout=self.slave, 
+				stderr=self.slave, 
+				cwd=self.cwd, 
+				preexec_fn=os.setsid, 
+				text=True
+			)
 		Thread(target=self.output_thread, daemon=True, name="output").start()
 
 	def end_terminal(self):
-		if self.pty.isalive():
-			self.pty.terminate()
-			self.clear()
+		if OS == "Windows":
+			if self.pty.isalive():
+				self.pty.terminate()
+				self.clear()
+		else:
+			if self.pty.poll() is None:
+				self.pty.terminate()
+				self.clear()
 	
 	def output_thread(self):
-		while self.pty.isalive():
-			try:
-				output = self.pty.read()
-				clean_output = self.strip_ansi_escape_sequences(output)
-				if clean_output == "" or (clean_output == "\n" and self.count > 0):
-					continue
-				self.output_received.emit(clean_output)
-				self.count += 1
-			except Exception as e:
-				print(e, e.__class__)
-			time.sleep(0.001)
+		if OS == "Windows":
+			while self.pty.isalive():
+				try:
+					output = self.pty.read()
+					clean_output = self.strip_ansi_escape_sequences(output)
+					if clean_output == "" or (clean_output == "\n" and self.count > 0):
+						continue
+					self.output_received.emit(clean_output)
+					self.count += 1
+				except Exception as e:
+					print(e, e.__class__)
+				time.sleep(0.001)
+		else:
+			while self.pty.poll() is None:
+				try:
+					output = os.read(self.master, 1024).decode(errors='ignore')
+					clean_output = self.strip_ansi_escape_sequences(output)
+					if clean_output == "" or (clean_output == "\n" and self.count > 0):
+						continue
+					self.output_received.emit(clean_output)
+					self.count += 1
+				except Exception as e:
+					print(e, e.__class__)
 
 	def strip_ansi_escape_sequences(self, text):
 		text = self.ansi_escape.sub('', text)
@@ -73,7 +110,10 @@ class Terminal(QPlainTextEdit):
 			cursor.movePosition(cursor.MoveOperation.End, cursor.MoveMode.KeepAnchor)
 			cursor.removeSelectedText()
 		self.count = 0
-		self.pty.write(self.command.replace("\n", "\r\n").rstrip("\r\n") + "\r\n")
+		if OS == "Windows":
+			self.pty.write(self.command.replace("\n", "\r\n").rstrip("\r\n") + "\r\n")
+		else:
+			os.write(self.master, (self.command.replace("\n", "\r\n").rstrip("\r\n") + "\r\n").encode())
 
 	def keyPressEvent(self, event):
 		cursor = self.textCursor()
