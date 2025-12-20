@@ -12,14 +12,15 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		except :
 			self.lexer = get_lexer_by_name("text")
 		self.formats = {}
-		self.setup_formats(style)
+		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
+		self.setup_formats(style, lang)
 	
-	def setup_formats(self, style=None):
+	def setup_formats(self, style=None, lang="Text"):
 		style_data = style
 		if style is None:
 			with open(f"./monokai.json", "r") as f:
 				style_data = json.load(f)
-		for token_name, token in style_data.items():
+		for token_name, token in (list(style_data[lang].items()) if lang in style_data else []) + list(style_data["Text"].items()):
 			token_format = QTextCharFormat()
 			if "Foreground" in token:
 				token_format.setForeground(QColor(token["Foreground"]))
