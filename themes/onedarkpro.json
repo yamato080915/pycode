@@ -7,6 +7,8 @@
 			"Keyword": {"Foreground": "#C678DD"},
 			"Keyword.Namespace": {"Foreground": "#C678DD"},
 			"Keyword.Constant": {"Foreground": "#D19A66"},
+			"Keyword.Declaration": {"Foreground": "#C678DD"},
+			"Keyword.Reserved": {"Foreground": "#C678DD"},
 			"Keyword.Type": {"Foreground": "#C678DD"},
 			"Operator": {"Foreground": "#56B6C2"},
 			"Operator.Word": {"Foreground": "#C678DD"},
@@ -15,11 +17,14 @@
 			"Literal.String": {"Foreground": "#98C379"},
 			"Literal.String.Double": {"Foreground": "#98C379"},
 			"Literal.String.Single": {"Foreground": "#98C379"},
+			"Literal.String.Backtick": {"Foreground": "#98C379"},
+			"Literal.String.Char": {"Foreground": "#98C379"},
             "Literal.String.Escape": {"Foreground": "#56B6C2"},
 			"Literal.String.Affix": {"Foreground": "#C678DD"},
 			"Literal.String.Interpol": {"Foreground": "#C678DD"},
 			"Literal.Number.Integer": {"Foreground": "#D19A66"},
 			"Literal.Number.Float": {"Foreground": "#D19A66"},
+			"Literal.Number.Hex": {"Foreground": "#D19A66"},
 			"Name.Class": {"Foreground": "#E5C07B"},
 			"Name.Function": {"Foreground": "#61AFEF"}
 		},
@@ -31,6 +36,14 @@
 		"Json": {
 			"Name.Tag": {"Foreground": "#E06C75"}
 		},
+		"Markdown": {
+			"Keyword": {"Foreground": "#D19A66"},
+			"Generic.Heading": {"Foreground": "#E06C75"},
+			"Generic.Subheading": {"Foreground": "#E06C75"},
+			"Name.Tag": {"Foreground": "#61AFEF"},
+			"Name.Attribute": {"Foreground": "#C678DD"},
+			"Name.Label": {"Foreground": "#D19A66"}
+		},
 		"Python": {
 			"Name": {"Foreground": "#E06C75"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
@@ -40,22 +53,37 @@
 			"Name.Exception": {"Foreground": "#E5C07B"},
 			"Name.Variable.Magic": {"Foreground": "#E06C75"},
 			"Punctuation": {"Foreground": "#56B6C2"}
-		}, 
-		"Java": {
+		},
+		"C": {
+			"Comment.Preproc": {"Foreground": "#C678DD"},
+			"Comment.PreprocFile": {"Foreground": "#98C379"},
+			"Operator": {"Foreground": "#C678DD"},
 			"Name": {"Foreground": "#E06C75"},
-			"Name.Namespace": {"Foreground": "#E5C07B"},
-			"Name.Declaration": {"Foreground": "#C678DD"},
-			"Name.Attribute": {"Foreground": "#E5C07B"}
+			"Name.Builtin": {"Foreground": "#D19A66"},
+			"Punctuation": {"Foreground": "#56B6C2"}
 		},
 		"Cpp": {
 			"Comment.Preproc": {"Foreground": "#C678DD"},
 			"Comment.PreprocFile": {"Foreground": "#98C379"},
 			"Name": {"Foreground": "#E06C75"},
-			"Name.Class": {"Foreground": "#E5C07B"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
-			"Name.Function": {"Foreground": "#61AFEF"},
+			"Name.Builtin": {"Foreground": "#D19A66"},
 			"Punctuation": {"Foreground": "#56B6C2"},
 			"Operator": {"Foreground": "#C678DD"}
+		}, 
+		"CSharp": {
+			"Name": {"Foreground": "#E06C75"},
+			"Name.Namespace": {"Foreground": "#E5C07B"},
+			"Name.Attribute": {"Foreground": "#E5C07B"},
+			"Punctuation": {"Foreground": "#56B6C2"}
+		},
+		"Java": {
+			"Name": {"Foreground": "#E06C75"},
+			"Name.Namespace": {"Foreground": "#E5C07B"},
+			"Name.Declaration": {"Foreground": "#C678DD"},
+			"Name.Attribute": {"Foreground": "#61AFEF"},
+			"Name.Decorator": {"Foreground": "#E5C07B"},
+			"Punctuation": {"Foreground": "#56B6C2"}
 		}
 	}
 }

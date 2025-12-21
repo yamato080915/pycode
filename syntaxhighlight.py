@@ -20,7 +20,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		if style is None:
 			with open(f"./monokai.json", "r") as f:
 				style_data = json.load(f)
-		for token_name, token in (list(style_data[lang].items()) if lang in style_data else []) + list(style_data["Text"].items()):
+		for token_name, token in (list(style_data["Text"].items()) + list(style_data[lang].items()) if lang in style_data else []):
 			token_format = QTextCharFormat()
 			if "Foreground" in token:
 				token_format.setForeground(QColor(token["Foreground"]))
