@@ -6,21 +6,23 @@ import json
 class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 	def __init__(self, parent=None, filename = "*.txt", style=None):
 		super().__init__(parent)
-
+		self.style = style
+		self.set_filetype(filename)
+	
+	def set_filetype(self, filename):
 		try:
 			self.lexer = get_lexer_for_filename(filename)
 		except :
 			self.lexer = get_lexer_by_name("text")
-		self.formats = {}
 		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
-		self.setup_formats(style, lang)
-	
-	def setup_formats(self, style=None, lang="Text"):
-		style_data = style
-		if style is None:
-			with open(f"./monokai.json", "r") as f:
-				style_data = json.load(f)
-		for token_name, token in (list(style_data["Text"].items()) + list(style_data[lang].items()) if lang in style_data else []):
+		self.formats = {}
+		self.setup_formats(lang)
+
+	def setup_formats(self, lang="Text"):
+		if self.style is None:
+			with open(f"./themes/monokai.json", "r") as f:
+				self.style = json.load(f)
+		for token_name, token in (list(self.style["Text"].items()) + list(self.style[lang].items()) if lang in self.style else []):
 			token_format = QTextCharFormat()
 			if "Foreground" in token:
 				token_format.setForeground(QColor(token["Foreground"]))

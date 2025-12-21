@@ -187,7 +187,7 @@ class Window(QMainWindow):
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
-		PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
+		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		self.tablist[-1].document().setDefaultTextOption(options)
 		
 		self.tabs.addTab(self.tablist[-1], name)
@@ -241,7 +241,8 @@ class Window(QMainWindow):
 			try:
 				with open(file_path, 'w', encoding='utf-8') as file:
 					file.write(current_tab.toPlainText())
-				current_tab.file_path = file_path
+				current_tab.highlighter.set_filetype(file_path)
+				current_tab.highlighter.rehighlight()
 				self.tabs.setTabText(self.tabs.currentIndex(), QFileInfo(file_path).fileName())
 			except Exception as e:
 				QMessageBox.critical(self, "エラー", f"ファイルの保存に失敗しました: {str(e)}")
