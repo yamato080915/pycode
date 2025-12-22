@@ -11,12 +11,13 @@ with open(f"{STYLE}.json", "r", encoding="utf-8") as f:
 	STYLE = json.load(f)
 if not "theme" in STYLE:
 	STYLE["theme"] = "themes/monokai.css"
+
 class Window(QMainWindow):
 	def __init__(self):
 		super().__init__()
 		self.setStyleSheet(open(STYLE["theme"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
-		self.resize(800, 600)
+		self.resize(1600, 900)
 		
 		self.FONT = QFont("Consolas", 11)
 
@@ -187,8 +188,8 @@ class Window(QMainWindow):
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
-		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		self.tablist[-1].document().setDefaultTextOption(options)
+		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
