@@ -4,6 +4,7 @@ from PySide6.QtGui import QFont, QAction, QTextOption, QFontMetrics
 from PySide6.QtCore import Qt, QDir, QFileInfo, QSettings
 from terminal import Terminal
 from syntaxhighlight import PygmentsSyntaxHighlight
+from linenumberedit import LineNumberEdit
 
 embedded_python = "python\\python.exe"
 STYLE = "themes/onedarkpro"
@@ -183,7 +184,7 @@ class Window(QMainWindow):
 			self.tabfilelist.append(path)
 		else:
 			self.tabfilelist.append(None)
-		self.tablist.append(QPlainTextEdit())
+		self.tablist.append(LineNumberEdit())
 		self.tablist[-1].setFont(self.FONT)
 		
 		options = QTextOption()

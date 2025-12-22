@@ -10,13 +10,29 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		self.style = style
 		self.set_filetype(filename)
 		self.token_cache = {}
+		self.use_cache = False
 		
 		self.tokenize_timer = QTimer()
 		self.tokenize_timer.setSingleShot(True)
 		self.tokenize_timer.setInterval(1000)
 		self.tokenize_timer.timeout.connect(self.tokenize)
 		
-		self.document().contentsChanged.connect(self.schedule_tokenize)
+		self.document().contentsChange.connect(self.changed)
+	
+	def changed(self, position, chars_removed, chars_added):
+		if self.tokenize_timer.isActive():
+			self.use_cache = False
+			
+			doc = self.document()
+			start_block = doc.findBlock(position)
+			end_block = doc.findBlock(position + chars_added)
+			
+			block = start_block
+			while block.isValid() and block.blockNumber() <= end_block.blockNumber():
+				self.rehighlightBlock(block)
+				block = block.next()
+		
+		self.schedule_tokenize()
 	
 	def schedule_tokenize(self):
 		self.tokenize_timer.stop()
@@ -50,6 +66,8 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 			self.formats[token] = token_format
 	
 	def tokenize(self):
+		self.document().contentsChange.disconnect(self.changed)
+		
 		text = self.document().toPlainText()
 		tokens = list(self.lexer.get_tokens(text))
 		num = 0
@@ -70,15 +88,31 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		if cache:
 			self.token_cache[num] = cache
 		
+		self.use_cache = True
 		self.rehighlight()
+		self.document().contentsChange.connect(self.changed)
+	
 	def highlightBlock(self, text):
 		block_number = self.currentBlock().blockNumber()
-		tokens = self.token_cache.get(block_number, [])
 		
-		for token, value, offset in tokens:
-			format = self.get_format_for_token(token)
-			if format:
-				self.setFormat(offset, len(value), format)
+		if self.use_cache:
+			tokens = self.token_cache.get(block_number, [])
+			for token, value, offset in tokens:
+				format = self.get_format_for_token(token)
+				if format:
+					self.setFormat(offset, len(value), format)
+		else:
+			try:
+				tokens = list(self.lexer.get_tokens(text))
+				offset = 0
+				for token, value in tokens:
+					length = len(value)
+					format = self.get_format_for_token(token)
+					if format:
+						self.setFormat(offset, length, format)
+					offset += length
+			except Exception as e:
+				print(f"Error in highlightBlock: {e}")
 
 	def get_format_for_token(self, token):
 		if token in self.formats:
