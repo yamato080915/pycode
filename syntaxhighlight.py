@@ -76,15 +76,25 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		self.token_cache.clear()
 		
 		for token, value in tokens:
-			if value == "\n":
-				self.token_cache[num] = cache
-				num += 1
-				cache = []
-				offset = 0
+			# 改行を含む場合、複数行に分割
+			if '\n' in value:
+				lines = value.split('\n')
+				for i, line in enumerate(lines):
+					if line:  # 空でない場合
+						cache.append((token, line, offset))
+						offset += len(line)
+					
+					if i < len(lines) - 1:  # 改行がある（最後以外）
+						# 現在の行を保存
+						self.token_cache[num] = cache
+						num += 1
+						cache = []
+						offset = 0
 			else:
 				cache.append((token, value, offset))
 				offset += len(value)
 		
+		# 最後の行を保存
 		if cache:
 			self.token_cache[num] = cache
 		
