@@ -1,8 +1,13 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 from PySide6.QtCore import QTimer
 from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
-from pygments.token import Token
+from pygments.token import Token, Punctuation
 import json
+
+Punctuation.Bracket
+Punctuation.Bracket.Depth0
+Punctuation.Bracket.Depth1
+Punctuation.Bracket.Depth2
 
 class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 	def __init__(self, parent=None, filename = "*.txt", style=None):
@@ -16,7 +21,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		self.tokenize_timer.setSingleShot(True)
 		self.tokenize_timer.setInterval(1000)
 		self.tokenize_timer.timeout.connect(self.tokenize)
-		
+
 		self.document().contentsChange.connect(self.changed)
 	
 	def changed(self, position, chars_removed, chars_added):
@@ -51,7 +56,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		if self.style is None:
 			with open(f"./themes/monokai.json", "r") as f:
 				self.style = json.load(f)
-		for token_name, token in (list(self.style["Text"].items()) + list(self.style[lang].items()) if lang in self.style else []):
+		for token_name, token in (list(self.style["Text"].items()) + (list(self.style[lang].items()) if lang in self.style else [])):
 			token_format = QTextCharFormat()
 			if "Foreground" in token:
 				token_format.setForeground(QColor(token["Foreground"]))
@@ -75,26 +80,39 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		cache = []
 		self.token_cache.clear()
 		
+		brackets = 0
+
 		for token, value in tokens:
-			# 改行を含む場合、複数行に分割
+			if value in (')', '}', ']'):
+				brackets = (brackets - 1)%3
 			if '\n' in value:
 				lines = value.split('\n')
 				for i, line in enumerate(lines):
-					if line:  # 空でない場合
+					if line:
 						cache.append((token, line, offset))
 						offset += len(line)
 					
-					if i < len(lines) - 1:  # 改行がある（最後以外）
-						# 現在の行を保存
+					if i < len(lines) - 1:
 						self.token_cache[num] = cache
 						num += 1
 						cache = []
 						offset = 0
 			else:
-				cache.append((token, value, offset))
+				if value in ('(', ')', '{', '}', '[', ']'):
+					if brackets == 0:
+						bracket_token = Punctuation.Bracket.Depth0
+					elif brackets == 1:
+						bracket_token = Punctuation.Bracket.Depth1
+					elif brackets == 2:
+						bracket_token = Punctuation.Bracket.Depth2
+					
+					cache.append((bracket_token, value, offset))
+				else:
+					cache.append((token, value, offset))
 				offset += len(value)
+			if value in ('(', '{', '['):
+				brackets = (brackets + 1)%3
 		
-		# 最後の行を保存
 		if cache:
 			self.token_cache[num] = cache
 		
@@ -117,6 +135,8 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 				offset = 0
 				for token, value in tokens:
 					length = len(value)
+					if value in ('(', ')', '{', '}', '[', ']'):
+						token = Punctuation.Bracket
 					format = self.get_format_for_token(token)
 					if format:
 						self.setFormat(offset, length, format)

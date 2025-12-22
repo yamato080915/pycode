@@ -26,7 +26,12 @@
 			"Literal.Number.Float": {"Foreground": "#D19A66"},
 			"Literal.Number.Hex": {"Foreground": "#D19A66"},
 			"Name.Class": {"Foreground": "#E5C07B"},
-			"Name.Function": {"Foreground": "#61AFEF"}
+			"Name.Function": {"Foreground": "#61AFEF"},
+			"Punctuation": {"Foreground": "#56B6C2"},
+			"Punctuation.Bracket": {"Foreground": "#D19A66"},
+			"Punctuation.Bracket.Depth0": {"Foreground": "#D19A66"},
+			"Punctuation.Bracket.Depth1": {"Foreground": "#C678DD"},
+			"Punctuation.Bracket.Depth2": {"Foreground": "#56B6C2"}
 		},
 		"Css": {
 			"Name.Namespace": {"Foreground": "#D19A66"},
@@ -51,16 +56,14 @@
 			"Name.Function.Magic": {"Foreground": "#56B6C2"},
 			"Name.Builtin.Pseudo": {"Foreground": "#E5C07B"},
 			"Name.Exception": {"Foreground": "#E5C07B"},
-			"Name.Variable.Magic": {"Foreground": "#E06C75"},
-			"Punctuation": {"Foreground": "#56B6C2"}
+			"Name.Variable.Magic": {"Foreground": "#E06C75"}
 		},
 		"C": {
 			"Comment.Preproc": {"Foreground": "#C678DD"},
 			"Comment.PreprocFile": {"Foreground": "#98C379"},
 			"Operator": {"Foreground": "#C678DD"},
 			"Name": {"Foreground": "#E06C75"},
-			"Name.Builtin": {"Foreground": "#D19A66"},
-			"Punctuation": {"Foreground": "#56B6C2"}
+			"Name.Builtin": {"Foreground": "#D19A66"}
 		},
 		"Cpp": {
 			"Comment.Preproc": {"Foreground": "#C678DD"},
@@ -68,22 +71,19 @@
 			"Name": {"Foreground": "#E06C75"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
 			"Name.Builtin": {"Foreground": "#D19A66"},
-			"Punctuation": {"Foreground": "#56B6C2"},
 			"Operator": {"Foreground": "#C678DD"}
 		}, 
 		"CSharp": {
 			"Name": {"Foreground": "#E06C75"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
-			"Name.Attribute": {"Foreground": "#E5C07B"},
-			"Punctuation": {"Foreground": "#56B6C2"}
+			"Name.Attribute": {"Foreground": "#E5C07B"}
 		},
 		"Java": {
 			"Name": {"Foreground": "#E06C75"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
 			"Name.Declaration": {"Foreground": "#C678DD"},
 			"Name.Attribute": {"Foreground": "#61AFEF"},
-			"Name.Decorator": {"Foreground": "#E5C07B"},
-			"Punctuation": {"Foreground": "#56B6C2"}
+			"Name.Decorator": {"Foreground": "#E5C07B"}
 		}
 	}
 }
