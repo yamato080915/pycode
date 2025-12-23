@@ -5,6 +5,9 @@ from PySide6.QtCore import Qt, QDir, QFileInfo, QSettings
 from terminal import Terminal
 from syntaxhighlight import PygmentsSyntaxHighlight
 from linenumberedit import LineNumberEdit
+from activitybar import ActivityBar
+from sidebar import SideBar
+from menubar import MenuBar
 
 embedded_python = "python\\python.exe"
 STYLE = "themes/onedarkpro"
@@ -31,20 +34,12 @@ class Window(QMainWindow):
 		horizontal_splitter = QSplitter(Qt.Horizontal)
 
 		# -----------------------------------------------------------
-		# 🔹 ファイルツリー部
+		# アクティビティバー
 		# -----------------------------------------------------------
-		self.model = QFileSystemModel()
-		self.model.setRootPath(QDir.currentPath())
-		self.tree = QTreeView()
-		self.tree.setModel(self.model)
-		self.tree.setRootIndex(self.model.index(QDir.currentPath()))
-		for column in range(1, self.tree.model().columnCount()):
-			self.tree.hideColumn(column)
-		self.tree.setColumnWidth(0, 200)
-		self.tree.setHeaderHidden(True)
-		self.tree.clicked.connect(self.open_file_from_tree)
+		self.activity_bar = ActivityBar(self)
+		self.sidebar = SideBar(self)
 		# -----------------------------------------------------------
-		# 🔸 テキストエディタ部
+		# テキストエディタ部
 		# -----------------------------------------------------------
 		self.tabs = QTabWidget()
 		self.tabs.setTabsClosable(True)
@@ -54,7 +49,7 @@ class Window(QMainWindow):
 		self.tabfilelist = []
 		self.newtab(name="Untitled")
 		# -----------------------------------------------------------
-		# 🔻 下：コンソール・出力ビュー
+		# 下：コンソール・出力ビュー
 		# -----------------------------------------------------------
 		self.console = Terminal()
 		# -----------------------------------------------------------
@@ -62,109 +57,21 @@ class Window(QMainWindow):
 		# -----------------------------------------------------------
 		vertical_splitter.addWidget(self.tabs)
 		vertical_splitter.addWidget(self.console)
-		vertical_splitter.setStretchFactor(0, 3)
-		vertical_splitter.setStretchFactor(1, 1)
-
-		horizontal_splitter.addWidget(self.tree)
+		vertical_splitter.setStretchFactor(0, 1)
+		vertical_splitter.setStretchFactor(1, 0)
+		vertical_splitter.setSizes([self.height() - 240, 240])
+		
+		horizontal_splitter.addWidget(self.activity_bar)
+		horizontal_splitter.addWidget(self.sidebar)
 		horizontal_splitter.addWidget(vertical_splitter)
-		horizontal_splitter.setStretchFactor(0, 1)
-		horizontal_splitter.setStretchFactor(1, 4)
+		horizontal_splitter.setStretchFactor(0, 0)
+		horizontal_splitter.setStretchFactor(1, 0)
+		horizontal_splitter.setStretchFactor(2, 1)
 
 		self.main_layout.addWidget(horizontal_splitter)
 
-		self.create_menu_bar()
+		MenuBar(self)
 		self.create_status_bar()
-
-	def create_menu_bar(self):
-		menubar = self.menuBar()
-
-		#--------------------------------------------------------
-		# メニュー項目のフォントを設定
-		file_menu = menubar.addMenu("ファイル(&F)")
-		file_menu.setFont(self.FONT)
-
-		new_action = QAction("新しいテキストファイル", self)
-		new_action.setFont(self.FONT)
-		new_action.setShortcut("Ctrl+N")
-		new_action.triggered.connect(lambda: self.newtab(name="Untitled"))
-		
-		open_action = QAction("ファイルを開く...", self)
-		open_action.setFont(self.FONT)
-		open_action.setShortcut("Ctrl+O")
-		open_action.triggered.connect(self.open_file)
-		
-		open_folder_action = QAction("フォルダーを開く...", self)
-		open_folder_action.setShortcut("Ctrl+K")
-		open_folder_action.triggered.connect(self.open_folder)
-
-		save_action = QAction("保存", self)
-		save_action.setShortcut("Ctrl+S")
-		save_action.triggered.connect(self.save_file)
-		
-		save_as_action = QAction("名前を付けて保存", self)
-		save_as_action.setShortcut("Ctrl+Shift+S")
-		save_as_action.triggered.connect(self.save_file_as)
-		
-		file_menu.addAction(new_action)
-		file_menu.addAction(open_action)
-		file_menu.addAction(open_folder_action)
-		file_menu.addSeparator()
-		file_menu.addAction(save_action)
-		file_menu.addAction(save_as_action)
-		file_menu.addSeparator()
-		
-		close_action = QAction("タブを閉じる", self)
-		close_action.triggered.connect(lambda: self.close_tab(self.tabs.currentIndex()))
-		file_menu.addAction(close_action)
-
-		close_all_action = QAction("すべてのタブを閉じる", self)
-		close_all_action.triggered.connect(lambda: [self.close_tab(i) for i in reversed(range(self.tabs.count()))])
-		file_menu.addAction(close_all_action)
-
-		exit_action = QAction("終了", self)
-		exit_action.triggered.connect(self.close)
-		file_menu.addAction(exit_action)
-		#--------------------------------------------------------
-		edit_menu = menubar.addMenu("編集(&E)")
-		edit_menu.setFont(self.FONT)
-
-		undo_action = QAction("元に戻す", self)
-		undo_action.setFont(self.FONT)
-		undo_action.setShortcut("Ctrl+Z")
-		undo_action.triggered.connect(lambda: self.tablist[self.tabs.currentIndex()].undo())
-
-		redo_action = QAction("やり直す", self)
-		redo_action.setFont(self.FONT)
-		redo_action.setShortcut("Ctrl+Y")
-		redo_action.triggered.connect(lambda: self.tablist[self.tabs.currentIndex()].redo())
-
-		edit_menu.addAction(undo_action)
-		edit_menu.addAction(redo_action)
-		edit_menu.addSeparator()
-
-		cut_action = QAction("切り取り", self)
-		cut_action.setShortcut("Ctrl+X")
-		cut_action.triggered.connect(lambda: self.tablist[self.tabs.currentIndex()].cut())
-
-		copy_action = QAction("コピー", self)
-		copy_action.setShortcut("Ctrl+C")
-		copy_action.triggered.connect(lambda: self.tablist[self.tabs.currentIndex()].copy())
-
-		paste_action = QAction("貼り付け", self)
-		paste_action.setShortcut("Ctrl+V")
-		paste_action.triggered.connect(lambda: self.tablist[self.tabs.currentIndex()].paste())
-
-		edit_menu.addAction(cut_action)
-		edit_menu.addAction(copy_action)
-		edit_menu.addAction(paste_action)
-		#--------------------------------------------------------
-		run_menu = menubar.addMenu("実行(&R)")
-		run_menu.setFont(self.FONT)
-
-		run_action = QAction("デバッグなしで実行", self)
-		run_action.setShortcut("F5")
-		run_action.triggered.connect(self.run_code)
-		run_menu.addAction(run_action)
 
 	def create_status_bar(self):
 		status_bar = self.statusBar()
@@ -220,7 +127,7 @@ class Window(QMainWindow):
 	def open_folder(self):#フォルダーを開く
 		folder_path = QFileDialog.getExistingDirectory(self, "フォルダーを開く", "")
 		if folder_path:
-			self.tree.setRootIndex(self.model.index(folder_path))
+			self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(folder_path))
 			self.console.end_terminal()
 			os.chdir(folder_path)
 			self.console.start_terminal()
@@ -288,7 +195,7 @@ class Window(QMainWindow):
 			self.run_command(f"{embedded_python} {current_tab.file_path}")
 
 	def open_file_from_tree(self, index):#ファイルツリーから開く(クリック)
-		file_path = self.model.filePath(index)
+		file_path = self.sidebar.explorer.file_model.filePath(index)
 		if file_path in self.tabfilelist:
 			tab_index = self.tabfilelist.index(file_path)
 			self.tabs.setCurrentIndex(tab_index)

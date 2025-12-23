@@ -138,3 +138,47 @@ QScrollBar::add-line, QScrollBar::sub-line {
 QScrollBar::add-page, QScrollBar::sub-page {
 	background: none;
 }
+
+/* Activity Bar */
+#activity_bar {
+	background-color: #21252b;
+	border-right: 1px solid #181a1f;
+}
+
+#activity_bar QPushButton {
+	color: #6e7681;
+	border: none;
+	background-color: transparent;
+	border-left: 2px solid transparent;
+}
+
+#activity_bar QPushButton:hover {
+	color: #abb2bf;
+	background-color: #2c313c;
+}
+
+#activity_bar QPushButton:checked {
+	color: #abb2bf;
+	background-color: #282c34;
+	border-left: 2px solid #61afef;
+}
+
+/* Sidebar (QStackedWidget) */
+#sidebar {
+	background-color: #21252b;
+	border-right: 1px solid #181a1f;
+}
+
+/* Sidebar Header/Title */
+#sidebar QLabel {
+	background-color: #21252b;
+	color: #abb2bf;
+	padding: 8px;
+	font-weight: bold;
+}
+
+#sidebar QWidget {
+	background-color: #21252b;
+	color: #abb2bf;
+	border: 1px solid #3e4451;
+}
