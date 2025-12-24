@@ -1,7 +1,7 @@
 import sys, os, json
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QFont, QAction, QTextOption, QFontMetrics
-from PySide6.QtCore import Qt, QDir, QFileInfo, QSettings
+from PySide6.QtGui import QFont, QTextOption, QFontMetrics
+from PySide6.QtCore import Qt, QFileInfo, QSettings
 from terminal import Terminal
 from syntaxhighlight import PygmentsSyntaxHighlight
 from linenumberedit import LineNumberEdit

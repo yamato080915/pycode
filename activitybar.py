@@ -6,6 +6,7 @@ class ActivityBar(QWidget):
 		self.setObjectName("activity_bar")
 
 		self.bar_layout = QVBoxLayout(self)
+		self.setFixedWidth(48)
 		self.bar_layout.setContentsMargins(0,0,0,0)
 		self.bar_layout.setSpacing(0)
 

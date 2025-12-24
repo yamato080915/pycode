@@ -52,7 +52,15 @@
 		"Python": {
 			"Name": {"Foreground": "#E06C75"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
-			"Name.Builtin": {"Foreground": "#61AFEF"},
+			"Name.Builtin": {
+				"Foreground": "#61AFEF",
+				"Replace": [
+					[
+						["int", "float", "complex", "bool", "list", "tuple", "range", "str", "bytes", "bytearray", "memoryview", "set", "frozenset", "dict", "type", "object", "classmethod", "staticmethod", "super", "property"], 
+						"Name.Builtin.Pseudo"
+					]
+				]
+			},
 			"Name.Function.Magic": {"Foreground": "#56B6C2"},
 			"Name.Builtin.Pseudo": {"Foreground": "#E5C07B"},
 			"Name.Exception": {"Foreground": "#E5C07B"},

@@ -50,6 +50,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 			self.lexer = get_lexer_by_name("text")
 		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
 		self.formats = {}
+		self.replace = {}
 		self.setup_formats(lang)
 
 	def setup_formats(self, lang="Text"):
@@ -65,6 +66,15 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 					token_format.setFontWeight(QFont.Weight.Bold)
 				if "italic" in token["FontStyle"]:
 					token_format.setFontItalic(True)
+			if "Replace" in token:
+				self.replace[token_name] = []
+				for i, j in token["Replace"]:
+					t = Token
+					for x in j.split('.'):
+						t = getattr(t, x)
+					self.replace[token_name].append((tuple(i), t))
+				self.replace[token_name] = tuple(self.replace[token_name])
+						
 			token = Token
 			for part in token_name.split('.'):
 				token = getattr(token, part)
@@ -83,7 +93,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		brackets = 0
 
 		for token, value in tokens:
-			if value in (')', '}', ']'):
+			if value in (')', '}', ']') and token == Punctuation:
 				brackets = (brackets - 1)%3
 			if '\n' in value:
 				lines = value.split('\n')
@@ -98,7 +108,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 						cache = []
 						offset = 0
 			else:
-				if value in ('(', ')', '{', '}', '[', ']'):
+				if value in ('(', ')', '{', '}', '[', ']') and token == Punctuation:
 					if brackets == 0:
 						bracket_token = Punctuation.Bracket.Depth0
 					elif brackets == 1:
@@ -107,10 +117,19 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 						bracket_token = Punctuation.Bracket.Depth2
 					
 					cache.append((bracket_token, value, offset))
+				elif str(token).replace("Token.", "") in self.replace:
+					flag = False
+					for x, y in self.replace[str(token).replace("Token.", "")]:
+						if value in x:
+							cache.append((y, value, offset))
+							flag = True
+							break
+					if not flag:
+						cache.append((token, value, offset))
 				else:
 					cache.append((token, value, offset))
 				offset += len(value)
-			if value in ('(', '{', '['):
+			if value in ('(', '{', '[') and token == Punctuation:
 				brackets = (brackets + 1)%3
 		
 		if cache:
