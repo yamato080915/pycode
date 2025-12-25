@@ -62,7 +62,7 @@ class MenuBar:
 		undo_action.setShortcut("Ctrl+Z")
 		undo_action.triggered.connect(lambda: self.window.tablist[self.window.tabs.currentIndex()].undo())
 
-		redo_action = QAction("やり直す", self.window)
+		redo_action = QAction("やり直し", self.window)
 		redo_action.setShortcut("Ctrl+Y")
 		redo_action.triggered.connect(lambda: self.window.tablist[self.window.tabs.currentIndex()].redo())
 
@@ -82,6 +82,14 @@ class MenuBar:
 		select_all_action.setShortcut("Ctrl+A")
 		select_all_action.triggered.connect(lambda: self.window.tablist[self.window.tabs.currentIndex()].selectAll())
 
+		search_action = QAction("検索", self.window)
+		search_action.setShortcut("Ctrl+F")
+		#search_action.triggered.connect(self.window.open_search_bar)
+		
+		replace_action = QAction("置換", self.window)
+		replace_action.setShortcut("Ctrl+H")
+		#replace_action.triggered.connect(self.window.open_replace_bar)
+
 		self.edit_menu.addAction(undo_action)
 		self.edit_menu.addAction(redo_action)
 		self.edit_menu.addSeparator()
@@ -90,7 +98,10 @@ class MenuBar:
 		self.edit_menu.addAction(paste_action)
 		self.edit_menu.addSeparator()
 		self.edit_menu.addAction(select_all_action)
-	
+		self.edit_menu.addSeparator()
+		self.edit_menu.addAction(search_action)
+		self.edit_menu.addAction(replace_action)
+
 	def runmenu(self):
 		self.run_menu = self.menubar.addMenu("実行(&R)")
 		self.run_menu.setFont(self.window.FONT)
@@ -99,4 +110,10 @@ class MenuBar:
 		run_action.setShortcut("F5")
 		run_action.triggered.connect(self.window.run_code)
 
+		new_terminal_action = QAction("新しいターミナル", self.window)
+		new_terminal_action.setShortcut("Ctrl+Shift+@")
+		new_terminal_action.triggered.connect(self.window.ConsoleGroup.add_terminal)
+
 		self.run_menu.addAction(run_action)
+		self.run_menu.addSeparator()
+		self.run_menu.addAction(new_terminal_action)

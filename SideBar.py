@@ -1,9 +1,12 @@
 from PySide6.QtWidgets import *
-from explorer import Explorer
+from PySide6.QtGui import QIcon
+from Explorer import Explorer
+#from main import window as win
 
 class SideBar(QStackedWidget):
 	def __init__(self, window=None):
 		super().__init__()
+		self.win = window
 		self.setObjectName("sidebar")
 		self.explorer = Explorer(window)
 		self.addWidget(self.explorer)
@@ -21,8 +24,11 @@ class SideBar(QStackedWidget):
 		self.activity_btn_group.setExclusive(True)
 	
 	def switch_tab(self, index):
+		for i, btn in enumerate(self.activity_btn_group.buttons()):
+			btn.setIcon(QIcon(f"assets/{self.win.activity_bar.icons[i][0]}"))
 		if self.currentIndex() == index and self.isVisible():
 			self.hide()
 		else:
+			self.activity_btn_group.button(index).setIcon(QIcon(f"assets/{self.win.activity_bar.icons[index][1]}"))
 			self.setCurrentIndex(index)
 			self.show()

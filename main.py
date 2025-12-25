@@ -1,13 +1,15 @@
-import sys, os, json
+import sys, os, json, cssutils, logging
+from pathlib import Path
+import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics
 from PySide6.QtCore import Qt, QFileInfo, QSettings
-from terminal import Terminal
-from syntaxhighlight import PygmentsSyntaxHighlight
-from linenumberedit import LineNumberEdit
-from activitybar import ActivityBar
-from sidebar import SideBar
-from menubar import MenuBar
+from SyntaxHighlight import PygmentsSyntaxHighlight
+from LineNumberTextEdit import LineNumberTextEdit as TextBox
+from ActivityBar import ActivityBar
+from SideBar import SideBar
+from MenuBar import MenuBar
+from TerminalGroup import TerminalGroup
 
 embedded_python = "python\\python.exe"
 STYLE = "themes/onedarkpro"
@@ -16,6 +18,22 @@ with open(f"{STYLE}.json", "r", encoding="utf-8") as f:
 if not "theme" in STYLE:
 	STYLE["theme"] = "themes/monokai.css"
 
+cssutils.log.setLevel(logging.CRITICAL)
+parser = cssutils.CSSParser(validate=False)
+for rule in parser.parseFile(STYLE["theme"]):
+	if rule.type == rule.STYLE_RULE:
+		if rule.selectorText == "QTextEdit":
+			color = rule.style.getPropertyValue("color")
+if not color:color = "#000000"
+ET.register_namespace("", "http://www.w3.org/2000/svg")
+for i in iter(p.name for p in Path("assets").iterdir() if p.is_file()):
+	tree = ET.parse(f"assets/{i}")
+	root = tree.getroot()
+	for elem in root.iter():
+		if 'fill' in elem.attrib:
+			elem.attrib['fill'] = color
+	tree.write(f"assets/{i}", encoding="utf-8", xml_declaration=False)
+	
 class Window(QMainWindow):
 	def __init__(self):
 		super().__init__()
@@ -51,12 +69,12 @@ class Window(QMainWindow):
 		# -----------------------------------------------------------
 		# 下：コンソール・出力ビュー
 		# -----------------------------------------------------------
-		self.console = Terminal()
+		self.ConsoleGroup = TerminalGroup()
 		# -----------------------------------------------------------
 		# スプリッター
 		# -----------------------------------------------------------
 		vertical_splitter.addWidget(self.tabs)
-		vertical_splitter.addWidget(self.console)
+		vertical_splitter.addWidget(self.ConsoleGroup)
 		vertical_splitter.setStretchFactor(0, 1)
 		vertical_splitter.setStretchFactor(1, 0)
 		vertical_splitter.setSizes([self.height() - 240, 240])
@@ -91,7 +109,7 @@ class Window(QMainWindow):
 			self.tabfilelist.append(path)
 		else:
 			self.tabfilelist.append(None)
-		self.tablist.append(LineNumberEdit())
+		self.tablist.append(TextBox())
 		self.tablist[-1].setFont(self.FONT)
 		
 		options = QTextOption()
@@ -128,9 +146,8 @@ class Window(QMainWindow):
 		folder_path = QFileDialog.getExistingDirectory(self, "フォルダーを開く", "")
 		if folder_path:
 			self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(folder_path))
-			self.console.end_terminal()
 			os.chdir(folder_path)
-			self.console.start_terminal()
+			self.ConsoleGroup.add_terminal()
 
 	def save_file(self):#保存
 		current_tab = self.tablist[self.tabs.currentIndex()]
@@ -183,8 +200,8 @@ class Window(QMainWindow):
 		return True
 
 	def run_command(self, command):
-		self.console.insertPlainText(command)
-		self.console.run_command()
+		self.ConsoleGroup.terminals[self.ConsoleGroup.terminalstack.currentIndex()].insertPlainText(command)
+		self.ConsoleGroup.terminals[self.ConsoleGroup.terminalstack.currentIndex()].run_command()
 
 	def run_code(self):#実行
 		current_tab = self.tablist[self.tabs.currentIndex()]

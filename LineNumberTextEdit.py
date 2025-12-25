@@ -15,9 +15,10 @@ class LineNumberArea(QWidget):
         self.editor.line_number_area_paint_event(event)
 
 
-class LineNumberEdit(QPlainTextEdit):
+class LineNumberTextEdit(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("TextBox")
         
         # 行番号表示用のウィジェット
         self.line_number_area = LineNumberArea(self)

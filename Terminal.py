@@ -15,6 +15,7 @@ class Terminal(QPlainTextEdit):
 	output_received = Signal(tuple)
 	def __init__(self):
 		super().__init__()
+		self.setObjectName("Terminal")
 		if OS == "Windows":
 			self.setFont(QFont("Cascadia Mono", 11))
 		else:
