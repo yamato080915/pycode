@@ -3,7 +3,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics
-from PySide6.QtCore import Qt, QFileInfo, QSettings
+from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from SyntaxHighlight import PygmentsSyntaxHighlight
 from LineNumberTextEdit import LineNumberTextEdit as TextBox
 from ActivityBar import ActivityBar
@@ -11,12 +11,14 @@ from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
 
-embedded_python = "python\\python.exe"
-STYLE = "themes/onedarkpro"
-with open(f"{STYLE}.json", "r", encoding="utf-8") as f:
+DIR = os.getcwd()
+embedded_python = f"{DIR}\\python\\python.exe"
+STYLE = "onedarkpro"
+with open(f"{DIR}\\themes\\{STYLE}.json", "r", encoding="utf-8") as f:
 	STYLE = json.load(f)
 if not "theme" in STYLE:
 	STYLE["theme"] = "themes/monokai.css"
+STYLE["theme"] = f"{DIR}/{STYLE['theme']}"
 
 cssutils.log.setLevel(logging.CRITICAL)
 parser = cssutils.CSSParser(validate=False)
@@ -26,17 +28,18 @@ for rule in parser.parseFile(STYLE["theme"]):
 			color = rule.style.getPropertyValue("color")
 if not color:color = "#000000"
 ET.register_namespace("", "http://www.w3.org/2000/svg")
-for i in iter(p.name for p in Path("assets").iterdir() if p.is_file()):
-	tree = ET.parse(f"assets/{i}")
+for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
+	tree = ET.parse(f"{DIR}/assets/{i}")
 	root = tree.getroot()
 	for elem in root.iter():
 		if 'fill' in elem.attrib:
 			elem.attrib['fill'] = color
-	tree.write(f"assets/{i}", encoding="utf-8", xml_declaration=False)
+	tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
 	
 class Window(QMainWindow):
 	def __init__(self):
-		super().__init__()
+		super().__init__()		
+		self.DIR = DIR
 		self.setStyleSheet(open(STYLE["theme"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
 		self.resize(1600, 900)
@@ -69,7 +72,7 @@ class Window(QMainWindow):
 		# -----------------------------------------------------------
 		# 下：コンソール・出力ビュー
 		# -----------------------------------------------------------
-		self.ConsoleGroup = TerminalGroup()
+		self.ConsoleGroup = TerminalGroup(self)
 		# -----------------------------------------------------------
 		# スプリッター
 		# -----------------------------------------------------------
@@ -115,7 +118,7 @@ class Window(QMainWindow):
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
 		self.tablist[-1].document().setDefaultTextOption(options)
-		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
+		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
@@ -146,7 +149,7 @@ class Window(QMainWindow):
 		folder_path = QFileDialog.getExistingDirectory(self, "フォルダーを開く", "")
 		if folder_path:
 			self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(folder_path))
-			os.chdir(folder_path)
+			QDir.setCurrent(folder_path)
 			self.ConsoleGroup.add_terminal()
 
 	def save_file(self):#保存
@@ -206,7 +209,6 @@ class Window(QMainWindow):
 	def run_code(self):#実行
 		current_tab = self.tablist[self.tabs.currentIndex()]
 		if not hasattr(current_tab, 'file_path'):
-			self.run_command("echo TEST COMMAND")
 			return
 		if os.path.splitext(current_tab.file_path)[-1] == ".py":
 			self.run_command(f"{embedded_python} {current_tab.file_path}")

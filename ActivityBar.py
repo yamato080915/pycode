@@ -5,6 +5,8 @@ class ActivityBar(QWidget):
 	def __init__(self, window=None):
 		super().__init__()
 		self.setObjectName("activity_bar")
+		
+		self.dir = window.DIR
 
 		self.bar_layout = QVBoxLayout(self)
 		self.setFixedWidth(48)
@@ -23,7 +25,7 @@ class ActivityBar(QWidget):
 	def explorer(self):
 		self.explorer_btn = QPushButton()
 		self.explorer_btn.setObjectName("explorer_btn")
-		self.explorer_btn.setIcon(QIcon(f"assets/{self.icons[0][1]}"))
+		self.explorer_btn.setIcon(QIcon(f"{self.dir}/assets/{self.icons[0][1]}"))
 		self.explorer_btn.setFixedSize(48,48)
 		self.explorer_btn.setCheckable(True)
 		self.explorer_btn.setChecked(True)
@@ -31,6 +33,6 @@ class ActivityBar(QWidget):
 	def search(self):
 		self.search_btn = QPushButton()
 		self.search_btn.setObjectName("search_btn")
-		self.search_btn.setIcon(QIcon(f"assets/{self.icons[1][0]}"))
+		self.search_btn.setIcon(QIcon(f"{self.dir}/assets/{self.icons[1][0]}"))
 		self.search_btn.setFixedSize(48,48)
 		self.search_btn.setCheckable(True)

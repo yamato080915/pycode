@@ -6,6 +6,7 @@ from Terminal import Terminal
 class TerminalGroup(QWidget):
 	def __init__(self, window=None):
 		super().__init__()
+		self.win = window
 
 		self.mainlayout = QHBoxLayout(self)
 		self.mainlayout.setContentsMargins(0,0,0,0)
@@ -32,10 +33,10 @@ class TerminalGroup(QWidget):
 	
 	def add_terminal(self, name="Terminal"):
 		for btn in self.btn_group.buttons():
-			btn.setIcon(QIcon("assets/terminal.svg"))
+			btn.setIcon(QIcon(f"{self.win.DIR}/assets/terminal.svg"))
 		btn = QPushButton()
 		btn.setObjectName("Terminal_Tab_Button")
-		btn.setIcon(QIcon("assets/terminal-fill.svg"))
+		btn.setIcon(QIcon(f"{self.win.DIR}/assets/terminal-fill.svg"))
 		btn.setCheckable(True)
 		btn.setChecked(True)
 		terminal_index = len(self.terminals)
@@ -47,8 +48,8 @@ class TerminalGroup(QWidget):
 	
 	def switch_terminal(self, index):
 		for i, btn in enumerate(self.btn_group.buttons()):
-			btn.setIcon(QIcon("assets/terminal.svg"))
-		self.btn_group.button(index).setIcon(QIcon("assets/terminal-fill.svg"))
+			btn.setIcon(QIcon(f"{self.win.DIR}/assets/terminal.svg"))
+		self.btn_group.button(index).setIcon(QIcon(f"{self.win.DIR}/assets/terminal-fill.svg"))
 		self.terminalstack.setCurrentIndex(index)
 		self.terminals[index].show()
 

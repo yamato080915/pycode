@@ -10,8 +10,9 @@ Punctuation.Bracket.Depth1
 Punctuation.Bracket.Depth2
 
 class PygmentsSyntaxHighlight(QSyntaxHighlighter):
-	def __init__(self, parent=None, filename = "*.txt", style=None):
+	def __init__(self, window=None, parent=None, filename = "*.txt", style=None):
 		super().__init__(parent)
+		self.win = window
 		self.style = style
 		self.set_filetype(filename)
 		self.token_cache = {}
@@ -55,7 +56,7 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 
 	def setup_formats(self, lang="Text"):
 		if self.style is None:
-			with open(f"./themes/monokai.json", "r") as f:
+			with open(f"{self.win.DIR}/themes/monokai.json", "r") as f:
 				self.style = json.load(f)
 		for token_name, token in (list(self.style["Text"].items()) + (list(self.style[lang].items()) if lang in self.style else [])):
 			token_format = QTextCharFormat()

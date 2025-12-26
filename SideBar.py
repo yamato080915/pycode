@@ -25,10 +25,10 @@ class SideBar(QStackedWidget):
 	
 	def switch_tab(self, index):
 		for i, btn in enumerate(self.activity_btn_group.buttons()):
-			btn.setIcon(QIcon(f"assets/{self.win.activity_bar.icons[i][0]}"))
+			btn.setIcon(QIcon(f"{self.win.DIR}/assets/{self.win.activity_bar.icons[i][0]}"))
 		if self.currentIndex() == index and self.isVisible():
 			self.hide()
 		else:
-			self.activity_btn_group.button(index).setIcon(QIcon(f"assets/{self.win.activity_bar.icons[index][1]}"))
+			self.activity_btn_group.button(index).setIcon(QIcon(f"{self.win.DIR}/assets/{self.win.activity_bar.icons[index][1]}"))
 			self.setCurrentIndex(index)
 			self.show()
