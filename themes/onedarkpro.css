@@ -80,7 +80,7 @@ QMenu::separator {
 	margin: 4px 0;
 }
 
-QStatusBar {
+#status_bar {
 	background-color: #21252b;
 	color: #5c6370;
 	border-top: 1px solid #3e4451;

@@ -1,7 +1,7 @@
 {	
 	"name": "Monokai",
-	"type": "theme",
-	"theme": "themes/monokai.css",
+	"type": "style",
+	"style": "themes/monokai.css",
 	"highlight": {
 		"Text": {
 			"Text": {"Foreground": "#F8F8F2"},

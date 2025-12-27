@@ -1,4 +1,4 @@
-import sys, os, json, cssutils, logging
+import sys, os, json, cssutils, logging, threading, time
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
@@ -12,17 +12,17 @@ from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
 
 DIR = os.getcwd()
-embedded_python = f"{DIR}\\python\\python.exe"
+embedded_python = f"{DIR}/python/python.exe"
 STYLE = "onedarkpro"
-with open(f"{DIR}\\themes\\{STYLE}.json", "r", encoding="utf-8") as f:
+with open(f"{DIR}/themes/{STYLE}.json", "r", encoding="utf-8") as f:
 	STYLE = json.load(f)
-if not "theme" in STYLE:
-	STYLE["theme"] = "themes/monokai.css"
-STYLE["theme"] = f"{DIR}/{STYLE['theme']}"
+if not "style" in STYLE:
+	STYLE["style"] = "themes/monokai.css"
+STYLE["style"] = f"{DIR}/{STYLE["style"]}"
 
 cssutils.log.setLevel(logging.CRITICAL)
 parser = cssutils.CSSParser(validate=False)
-for rule in parser.parseFile(STYLE["theme"]):
+for rule in parser.parseFile(STYLE["style"]):
 	if rule.type == rule.STYLE_RULE:
 		if rule.selectorText == "QTextEdit":
 			color = rule.style.getPropertyValue("color")
@@ -40,7 +40,7 @@ class Window(QMainWindow):
 	def __init__(self):
 		super().__init__()		
 		self.DIR = DIR
-		self.setStyleSheet(open(STYLE["theme"], "r", encoding="utf-8").read())
+		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
 		self.resize(1600, 900)
 		
@@ -95,16 +95,31 @@ class Window(QMainWindow):
 		self.create_status_bar()
 
 	def create_status_bar(self):
-		status_bar = self.statusBar()
-		status_bar.setFont(self.FONT)
+		self.status_bar = self.statusBar()
+		self.status_bar.setObjectName("status_bar")
+		self.status_bar.setFont(self.FONT)
 
 		self.permanent_message = QLabel()
 		self.permanent_message.setFont(self.FONT)
 		self.permanent_message.setText("Coming Soon")
 		
-		status_bar.addPermanentWidget(self.permanent_message)
+		self.status_bar.addPermanentWidget(self.permanent_message)
 
-		status_bar.messageChanged.connect(self.on_status_message_changed)
+		self.status_bar.messageChanged.connect(self.on_status_message_changed)
+		threading.Thread(target=self.update_status, daemon=True).start()
+
+	def update_status(self):
+		running = False
+		while True:
+			flag = False
+			if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
+				flag = True
+			if flag and not running:
+				self.status_bar.setStyleSheet("#status_bar {background-color: " + STYLE["theme"]["status_bar"]["running"]["background"] + "; color: " + STYLE["theme"]["status_bar"]["running"]["foreground"] + ";}")
+			elif not flag and running:
+				self.status_bar.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
+			running = flag
+			time.sleep(0.1)
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
 		if path is not None:
@@ -203,8 +218,9 @@ class Window(QMainWindow):
 		return True
 
 	def run_command(self, command):
-		self.ConsoleGroup.terminals[self.ConsoleGroup.terminalstack.currentIndex()].insertPlainText(command)
-		self.ConsoleGroup.terminals[self.ConsoleGroup.terminalstack.currentIndex()].run_command()
+		self.ConsoleGroup.switch_terminal(0)
+		self.ConsoleGroup.terminals[0].insertPlainText(command)
+		self.ConsoleGroup.terminals[0].run_command()
 
 	def run_code(self):#実行
 		current_tab = self.tablist[self.tabs.currentIndex()]

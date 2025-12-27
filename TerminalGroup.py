@@ -28,14 +28,14 @@ class TerminalGroup(QWidget):
 
 		self.mainlayout.addWidget(self.terminalstack)
 		self.mainlayout.addWidget(self.tab)
+		self.add_terminal("Runner")
 		self.add_terminal()
-	
 	
 	def add_terminal(self, name="Terminal"):
 		for btn in self.btn_group.buttons():
 			btn.setIcon(QIcon(f"{self.win.DIR}/assets/terminal.svg"))
 		btn = QPushButton()
-		btn.setObjectName("Terminal_Tab_Button")
+		btn.setObjectName(f"{name}_Tab_Button")
 		btn.setIcon(QIcon(f"{self.win.DIR}/assets/terminal-fill.svg"))
 		btn.setCheckable(True)
 		btn.setChecked(True)
@@ -43,7 +43,7 @@ class TerminalGroup(QWidget):
 		self.btn_group.addButton(btn, terminal_index)
 		self.tab_layout.addWidget(btn)
 		btn.clicked.connect(lambda: self.switch_terminal(terminal_index))
-		terminal = self.terminalstack.new()
+		terminal = self.terminalstack.new(name)
 		self.terminals.append(terminal)
 	
 	def switch_terminal(self, index):
@@ -58,8 +58,11 @@ class TerminalStack(QStackedWidget):
 		super().__init__()
 		self.setObjectName("terminal_stacked")
 	
-	def new(self):
+	def new(self, name="Terminal"):
 		terminal = Terminal()
 		self.addWidget(terminal)
 		self.setCurrentWidget(terminal)
+		if name=="Runner":
+			terminal.setReadOnly(True)
+			terminal.appendPlainText("This terminal is for running scripts.(Read-only)\n")
 		return terminal

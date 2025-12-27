@@ -1,7 +1,13 @@
 {
 	"name": "One Dark Pro",
-	"type": "theme",
-	"theme": "themes/onedarkpro.css",
+	"type": "style",
+	"style": "themes/onedarkpro.css",
+	"theme": {
+		"status_bar": {"running": {
+			"foreground": "#FFFFFF",
+			"background": "#CC6633"
+		}}
+	},
 	"highlight": {
 		"Text": {
 			"Keyword": {"Foreground": "#C678DD"},
@@ -27,7 +33,6 @@
 			"Literal.Number.Hex": {"Foreground": "#D19A66"},
 			"Name.Class": {"Foreground": "#E5C07B"},
 			"Name.Function": {"Foreground": "#61AFEF"},
-			"Punctuation": {"Foreground": "#56B6C2"},
 			"Punctuation.Bracket": {"Foreground": "#D19A66"},
 			"Punctuation.Bracket.Depth0": {"Foreground": "#D19A66"},
 			"Punctuation.Bracket.Depth1": {"Foreground": "#C678DD"},

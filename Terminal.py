@@ -1,4 +1,4 @@
-import sys, time, re, platform, os
+import sys, time, re, platform, os, psutil
 from threading import Thread
 from PySide6.QtWidgets import QApplication, QMainWindow, QPlainTextEdit
 from PySide6.QtGui import QFont
@@ -33,6 +33,25 @@ class Terminal(QPlainTextEdit):
 		self.osc_escape = re.compile(r'\]0;[^\x07]*\x07')
 		self.control_chars = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]')
 		self.cmd_pattern = re.compile(r'\d+;C:\\WINDOWS\\system32\\cmd\.exe[^\n]*')
+
+	@property
+	def running(self):
+		try:
+			if OS == "Windows":
+				if not hasattr(self, 'pty') or not self.pty.isalive():
+					return False
+				pid = self.pty.pid
+			else:
+				if not hasattr(self, 'pty') or self.pty.poll() is not None:
+					return False
+				pid = self.pty.pid
+			p = psutil.Process(pid)
+			children = p.children(recursive=True)
+
+			return [(child.pid, child.name()) for child in children]
+		except Exception as e:
+			print(e, e.__class__)
+			return []
 
 	def start_terminal(self):
 		self.cwd = QDir.currentPath()
