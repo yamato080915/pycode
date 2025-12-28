@@ -1,15 +1,16 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 from PySide6.QtCore import QTimer
 from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
-from pygments.token import Token, Punctuation
+from pygments.token import Token, Punctuation, Name
 import json
+from semantic import *
 
 Punctuation.Bracket
 Punctuation.Bracket.Depth0
 Punctuation.Bracket.Depth1
 Punctuation.Bracket.Depth2
 
-class PygmentsSyntaxHighlight(QSyntaxHighlighter):
+class Highlighter(QSyntaxHighlighter):
 	def __init__(self, window=None, parent=None, filename = "*.txt", style=None):
 		super().__init__(parent)
 		self.win = window
@@ -47,7 +48,8 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 	def set_filetype(self, filename):
 		try:
 			self.lexer = get_lexer_for_filename(filename)
-		except :
+		except Exception as e:
+			print(f"Error getting lexer for {filename}: {e}")
 			self.lexer = get_lexer_by_name("text")
 		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
 		self.formats = {}
@@ -90,9 +92,8 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 		offset = 0
 		cache = []
 		self.token_cache.clear()
-		
 		brackets = 0
-
+		semantic_analyzer = Semantic(text)
 		for token, value in tokens:
 			if value in (')', '}', ']') and token == Punctuation:
 				brackets = (brackets - 1)%3
@@ -127,6 +128,18 @@ class PygmentsSyntaxHighlight(QSyntaxHighlighter):
 							break
 					if not flag:
 						cache.append((token, value, offset))
+				elif token == Name:
+					kind = semantic_analyzer.lookup(value)
+					if kind == SymbolKind.Class:
+						token_ = Name.Class
+					elif kind == SymbolKind.Function:
+						token_ = Name.Function
+					elif kind == SymbolKind.Variable:
+						token_ = Name.Variable
+					else:
+						token_ = token
+					
+					cache.append((token_, value, offset))
 				else:
 					cache.append((token, value, offset))
 				offset += len(value)

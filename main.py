@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
-from SyntaxHighlight import PygmentsSyntaxHighlight
+from Highlight import Highlighter
 from LineNumberTextEdit import LineNumberTextEdit as TextBox
 from ActivityBar import ActivityBar
 from SideBar import SideBar
@@ -38,7 +38,7 @@ for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and
 	
 class Window(QMainWindow):
 	def __init__(self):
-		super().__init__()		
+		super().__init__()
 		self.DIR = DIR
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
@@ -133,7 +133,7 @@ class Window(QMainWindow):
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
 		self.tablist[-1].document().setDefaultTextOption(options)
-		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
+		self.tablist[-1].highlighter = Highlighter(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
