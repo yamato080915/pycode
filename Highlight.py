@@ -143,16 +143,19 @@ class Highlighter(QSyntaxHighlighter):
 					if not flag:
 						cache.append((token, value, offset))
 				elif token == Name:
-					kind_type = "module"
-					block = self.document().findBlockByNumber(num)
-					lineno = block.blockNumber() + 1
-					kind = set(module.lookup(value, lineno) for module in modulefiles.values())
-					kind.discard(None)
-					if len(kind) == 1:
-						kind = kind.pop()
-					else:
-						kind_type = "symbol"
-						kind = semantic_analyzer.lookup(value, lineno)
+					kind = None
+					kind_type = "symbol"
+					if self.lexer == get_lexer_by_name("Python"):
+						kind_type = "module"
+						block = self.document().findBlockByNumber(num)
+						lineno = block.blockNumber() + 1
+						kind = set(module.lookup(value, lineno) for module in modulefiles.values())
+						kind.discard(None)
+						if len(kind) == 1:
+							kind = kind.pop()
+						else:
+							kind_type = "symbol"
+							kind = semantic_analyzer.lookup(value, lineno)
 					token_ = None
 					if kind == SymbolKind.Class:
 						token_ = Name.Class
