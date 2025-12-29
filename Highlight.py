@@ -94,6 +94,19 @@ class Highlighter(QSyntaxHighlighter):
 		self.token_cache.clear()
 		brackets = 0
 		semantic_analyzer = Semantic(text)
+		modules = semantic_analyzer.modules
+		imported = semantic_analyzer.imported
+		modulefiles = {}
+		for key in modules.keys():
+			file = get_module_file(key)
+			if file:
+				with open(file, 'r', encoding='utf-8') as f:
+					modulefiles[key] = Semantic(f.read())
+			for value in modules[key].keys():
+				file = get_module_file(f"{value}")
+				if file:
+					with open(file, 'r', encoding='utf-8') as f:
+						modulefiles[value] = Semantic(f.read())
 		for token, value in tokens:
 			if value in (')', '}', ']') and token == Punctuation:
 				brackets = (brackets - 1)%3
@@ -129,13 +142,20 @@ class Highlighter(QSyntaxHighlighter):
 					if not flag:
 						cache.append((token, value, offset))
 				elif token == Name:
-					kind = semantic_analyzer.lookup(value)
+					kind = set([module.lookup(value) for module in modulefiles.values()])
+					kind.discard(None)
+					if len(kind) == 1:
+						kind = kind.pop()
+					else:
+						kind = semantic_analyzer.lookup(value)
 					if kind == SymbolKind.Class:
 						token_ = Name.Class
 					elif kind == SymbolKind.Function:
 						token_ = Name.Function
 					elif kind == SymbolKind.Variable:
 						token_ = Name.Variable
+					elif value in imported:
+						token_ = Name.Namespace
 					else:
 						token_ = token
 					

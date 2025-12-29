@@ -14,6 +14,8 @@ class SymbolTable:
 class SymbolCollector(ast.NodeVisitor):
 	def __init__(self):
 		self.table = SymbolTable()
+		self.modules = {}
+		self.imported = set()
 	
 	def visit_ClassDef(self, node):
 		self.table.symbols[node.name] = SymbolKind.Class
@@ -37,6 +39,19 @@ class SymbolCollector(ast.NodeVisitor):
 		if isinstance(node.target, ast.Name):
 			self.table.symbols[node.target.id] = SymbolKind.Variable
 		self.generic_visit(node)
+
+	def visit_Import(self, node):
+		for alias in node.names:
+			self.modules[alias.name] = {}
+			self.imported.add(alias.name)
+		self.generic_visit(node)
+	
+	def visit_ImportFrom(self, node):
+		if not node.module in self.modules:
+			self.modules[node.module] = {}
+		for alias in node.names:
+			self.modules[node.module][alias.name] = {}
+		self.generic_visit(node)
 	
 class Semantic:
 	def __init__(self, text):
@@ -50,23 +65,12 @@ class Semantic:
 			return
 		collector = SymbolCollector()
 		collector.visit(tree)
+		self.modules = collector.modules
 		self.table = collector.table
+		self.imported = collector.imported
 	
 	def lookup(self, name):
 		return self.table.symbols.get(name)
-
-class ModuleCollector(ast.NodeVisitor):
-	def __init__(self):
-		self.symbols = {"modules": {}}
-	def visit_Import(self, node):
-		for alias in node.names:
-			self.symbols["modules"][alias.name] = {}
-		self.generic_visit(node)
-	def visit_ImportFrom(self, node):
-		self.symbols["modules"][node.module] = []
-		for alias in node.names:
-			self.symbols["modules"][node.module].append(alias.name)
-		self.generic_visit(node)
 	
 def get_module_file(module):
 	try:
@@ -74,6 +78,8 @@ def get_module_file(module):
 		if spec and spec.origin:
 			if spec.origin.endswith('.pyd'):
 				return spec.origin.rstrip('.pyd') + '.pyi'
+			elif spec.origin == 'built-in':
+				return None
 			return spec.origin
 		return None
 	except:
