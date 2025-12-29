@@ -107,6 +107,7 @@ class Highlighter(QSyntaxHighlighter):
 				if file:
 					with open(file, 'r', encoding='utf-8') as f:
 						modulefiles[value] = Semantic(f.read())
+		index = 0
 		for token, value in tokens:
 			if value in (')', '}', ']') and token == Punctuation:
 				brackets = (brackets - 1)%3
@@ -142,29 +143,39 @@ class Highlighter(QSyntaxHighlighter):
 					if not flag:
 						cache.append((token, value, offset))
 				elif token == Name:
-					kind = set([module.lookup(value) for module in modulefiles.values()])
+					block = self.document().findBlockByNumber(num)
+					lineno = block.blockNumber() + 1
+					kind = set(module.lookup(value, lineno) for module in modulefiles.values())
 					kind.discard(None)
 					if len(kind) == 1:
 						kind = kind.pop()
 					else:
-						kind = semantic_analyzer.lookup(value)
+						kind = semantic_analyzer.lookup(value, lineno)
+					token_ = None
 					if kind == SymbolKind.Class:
 						token_ = Name.Class
-					elif kind == SymbolKind.Function:
-						token_ = Name.Function
-					elif kind == SymbolKind.Variable:
-						token_ = Name.Variable
-					elif value in imported:
-						token_ = Name.Namespace
-					else:
-						token_ = token
-					
+					if index > 0 and not token_ and kind != SymbolKind.Class:
+						prev_token, prev_value = tokens[index - 1]
+						if prev_value == '.':
+							next_token, next_value = tokens[index + 1] if index + 1 < len(tokens) else (None, None)
+							if next_value == "(":
+								token_ = Name.Function
+					if not token_:
+						if kind == SymbolKind.Function:
+							token_ = Name.Function
+						elif kind == SymbolKind.Variable:
+							token_ = Name.Variable
+						elif value in imported:
+							token_ = Name.Namespace
+						else:
+							token_ = token
 					cache.append((token_, value, offset))
 				else:
 					cache.append((token, value, offset))
 				offset += len(value)
 			if value in ('(', '{', '[') and token == Punctuation:
 				brackets = (brackets + 1)%3
+			index += 1
 		
 		if cache:
 			self.token_cache[num] = cache
