@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QActionGroup
+import os
 #from main import window as win
 
 class MenuBar:
@@ -8,6 +9,7 @@ class MenuBar:
 		self.menubar = self.window.menuBar()
 		self.filemenu()
 		self.editmenu()
+		self.viewmenu()
 		self.runmenu()
 	
 	def filemenu(self):
@@ -101,6 +103,33 @@ class MenuBar:
 		self.edit_menu.addSeparator()
 		self.edit_menu.addAction(search_action)
 		self.edit_menu.addAction(replace_action)
+
+	def viewmenu(self):
+		self.view_menu = self.menubar.addMenu("表示(&V)")
+		self.view_menu.setFont(self.window.FONT)
+		
+		self.theme_menu = self.view_menu.addMenu("テーマ")
+		self.theme_menu.setFont(self.window.FONT)
+
+		self.theme_action_group = QActionGroup(self.window)
+		self.theme_action_group.setExclusive(True)
+
+		themes_dir = f"{self.window.DIR}/themes"
+		theme_files = [f for f in os.listdir(themes_dir) if f.endswith('.json')]
+		
+		current_theme = self.window.STYLE if isinstance(self.window.STYLE, str) else "monokai"
+		
+		for theme_file in sorted(theme_files):
+			theme_name = os.path.splitext(theme_file)[0]
+			theme_action = QAction(theme_name, self.window)
+			theme_action.setCheckable(True)
+			theme_action.triggered.connect(lambda checked, t=theme_name: self.window.change_theme(t))
+			
+			if theme_name == current_theme:
+				theme_action.setChecked(True)
+			
+			self.theme_action_group.addAction(theme_action)
+			self.theme_menu.addAction(theme_action)
 
 	def runmenu(self):
 		self.run_menu = self.menubar.addMenu("実行(&R)")

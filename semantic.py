@@ -116,7 +116,7 @@ def get_module_file(module):
 		if spec and spec.origin:
 			if spec.origin.endswith('.pyd'):
 				return spec.origin.rstrip('.pyd') + '.pyi'
-			elif spec.origin == 'built-in':
+			elif spec.origin == 'built-in' or spec.origin == 'frozen':
 				return None
 			return spec.origin
 		return None

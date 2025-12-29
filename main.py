@@ -11,34 +11,41 @@ from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
 
+cssutils.log.setLevel(logging.CRITICAL)
+ET.register_namespace("", "http://www.w3.org/2000/svg")
+
 DIR = os.getcwd()
 embedded_python = f"{DIR}/python/python.exe"
 STYLE = "onedarkpro"
-with open(f"{DIR}/themes/{STYLE}.json", "r", encoding="utf-8") as f:
-	STYLE = json.load(f)
-if not "style" in STYLE:
-	STYLE["style"] = "themes/monokai.css"
-STYLE["style"] = f"{DIR}/{STYLE["style"]}"
 
-cssutils.log.setLevel(logging.CRITICAL)
-parser = cssutils.CSSParser(validate=False)
-for rule in parser.parseFile(STYLE["style"]):
-	if rule.type == rule.STYLE_RULE:
-		if rule.selectorText == "QTextEdit":
-			color = rule.style.getPropertyValue("color")
-if not color:color = "#000000"
-ET.register_namespace("", "http://www.w3.org/2000/svg")
-for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
-	tree = ET.parse(f"{DIR}/assets/{i}")
-	root = tree.getroot()
-	for elem in root.iter():
-		if 'fill' in elem.attrib:
-			elem.attrib['fill'] = color
-	tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
-	
+def change_theme(theme_name):
+	with open(f"{DIR}/themes/{theme_name}.json", "r", encoding="utf-8") as f:
+		style = json.load(f)
+	if not "style" in style:
+		style["style"] = "themes/monokai.css"
+	style["style"] = f"{DIR}/{style["style"]}"
+
+	parser = cssutils.CSSParser(validate=False)
+	for rule in parser.parseFile(style["style"]):
+		if rule.type == rule.STYLE_RULE:
+			if rule.selectorText == "QTextEdit":
+				color = rule.style.getPropertyValue("color")
+	if not color:color = "#000000"
+	for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
+		tree = ET.parse(f"{DIR}/assets/{i}")
+		root = tree.getroot()
+		for elem in root.iter():
+			if 'fill' in elem.attrib:
+				elem.attrib['fill'] = color
+		tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
+	return style
+
+STYLE = change_theme(STYLE)
+
 class Window(QMainWindow):
 	def __init__(self):
 		super().__init__()
+		self.STYLE = STYLE
 		self.DIR = DIR
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
@@ -115,9 +122,13 @@ class Window(QMainWindow):
 			if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
 				flag = True
 			if flag and not running:
-				self.status_bar.setStyleSheet("#status_bar {background-color: " + STYLE["theme"]["status_bar"]["running"]["background"] + "; color: " + STYLE["theme"]["status_bar"]["running"]["foreground"] + ";}")
+				bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
+				fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
+				self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color}; color: {fg_color}; }}")
 			elif not flag and running:
-				self.status_bar.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
+				bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
+				fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
+				self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color}; color: {fg_color}; }}")
 			running = flag
 			time.sleep(0.1)
 
@@ -242,6 +253,19 @@ class Window(QMainWindow):
 		if not message:
 			self.statusBar().showMessage("Ready")
 
+	def change_theme(self, theme_name):#テーマ変更
+		global STYLE
+		STYLE = change_theme(theme_name)
+		self.STYLE = STYLE
+		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
+
+		for tab in self.tablist:
+			tab.highlighter.formats.clear()
+			tab.highlighter.replace.clear()
+			tab.highlighter.style = STYLE["highlight"]
+			tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
+			tab.highlighter.rehighlight()
+
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
 		for i in range(len(self.tablist)):
@@ -258,4 +282,4 @@ if __name__=="__main__":
 	app = QApplication(sys.argv)
 	window = Window()
 	window.showMaximized()
-	sys.exit(app.exec()) 
+	sys.exit(app.exec())

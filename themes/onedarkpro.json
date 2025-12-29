@@ -3,10 +3,16 @@
 	"type": "style",
 	"style": "themes/onedarkpro.css",
 	"theme": {
-		"status_bar": {"running": {
-			"foreground": "#FFFFFF",
-			"background": "#CC6633"
-		}}
+		"status_bar": {
+			"running": {
+				"foreground": "#FFFFFF",
+				"background": "#CC6633"
+			},
+			"normal": {
+				"foreground": "#5c6370",
+				"background": "#21252b"
+			}
+		}
 	},
 	"highlight": {
 		"Text": {
