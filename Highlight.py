@@ -143,6 +143,7 @@ class Highlighter(QSyntaxHighlighter):
 					if not flag:
 						cache.append((token, value, offset))
 				elif token == Name:
+					kind_type = "module"
 					block = self.document().findBlockByNumber(num)
 					lineno = block.blockNumber() + 1
 					kind = set(module.lookup(value, lineno) for module in modulefiles.values())
@@ -150,6 +151,7 @@ class Highlighter(QSyntaxHighlighter):
 					if len(kind) == 1:
 						kind = kind.pop()
 					else:
+						kind_type = "symbol"
 						kind = semantic_analyzer.lookup(value, lineno)
 					token_ = None
 					if kind == SymbolKind.Class:
@@ -164,9 +166,14 @@ class Highlighter(QSyntaxHighlighter):
 						if kind == SymbolKind.Function:
 							token_ = Name.Function
 						elif kind == SymbolKind.Variable:
-							token_ = Name.Variable
+							if value.upper() == value and kind_type == "symbol":
+								token_ = Name.Constant
+							else:
+								token_ = Name.Variable
 						elif value in imported:
 							token_ = Name.Namespace
+						elif value.upper() == value:
+							token_ = Name.Constant
 						else:
 							token_ = token
 					cache.append((token_, value, offset))

@@ -56,6 +56,7 @@
 		},
 		"Python": {
 			"Name": {"Foreground": "#E06C75"},
+			"Name.Constant": {"Foreground": "#E5C07B"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
 			"Name.Builtin": {
 				"Foreground": "#61AFEF",
