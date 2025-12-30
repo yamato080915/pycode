@@ -1,4 +1,4 @@
-import sys, os, json, cssutils, logging, threading, time
+import sys, os, json, cssutils, logging, threading, time, subprocess
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
@@ -13,9 +13,15 @@ from TerminalGroup import TerminalGroup
 
 cssutils.log.setLevel(logging.CRITICAL)
 ET.register_namespace("", "http://www.w3.org/2000/svg")
+si = subprocess.STARTUPINFO()
+si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 
 DIR = os.getcwd()
 embedded_python = f"{DIR}/python/python.exe"
+def getpyversion():
+	PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
+	return PYV.stdout.strip()
+PYV = getpyversion()
 STYLE = "onedarkpro"
 
 def change_theme(theme_name):
@@ -108,7 +114,7 @@ class Window(QMainWindow):
 
 		self.permanent_message = QLabel()
 		self.permanent_message.setFont(self.FONT)
-		self.permanent_message.setText("Coming Soon")
+		self.permanent_message.setContentsMargins(0,0,10,0)
 		
 		self.status_bar.addPermanentWidget(self.permanent_message)
 
@@ -118,19 +124,43 @@ class Window(QMainWindow):
 	def update_status(self):
 		running = False
 		while True:
-			flag = False
-			if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
-				flag = True
-			if flag and not running:
-				bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
-				fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
-				self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color}; color: {fg_color}; }}")
-			elif not flag and running:
-				bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
-				fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
-				self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color}; color: {fg_color}; }}")
-			running = flag
-			time.sleep(0.1)
+			try:
+				disp_text = ""
+				current_tab = self.tablist[self.tabs.currentIndex()]
+
+				cursor = current_tab.textCursor()
+				line = cursor.blockNumber() + 1
+				column = cursor.columnNumber() + 1
+				disp_text += f"Ln {line}, Col {column}"
+				if cursor.hasSelection():
+					selection_start = cursor.selectionStart()
+					selection_end = cursor.selectionEnd()
+					selection_length = selection_end - selection_start
+					disp_text += f"(Sel {selection_length})"
+
+				if hasattr(current_tab, 'file_path'):
+					lang = str(current_tab.highlighter.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
+					disp_text += " | " + (f"{PYV}" if lang == "Python" else lang)
+				
+				self.permanent_message.setText(disp_text)
+				
+				flag = False
+				if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
+					flag = True
+				if flag and not running:
+					bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
+					fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
+					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
+					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+				elif not flag and running:
+					bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
+					fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
+					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
+					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+				running = flag
+				time.sleep(0.03)
+			except Exception as e:
+				print("Status Bar Update Error:", e)
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
 		if path is not None:
@@ -140,6 +170,10 @@ class Window(QMainWindow):
 			self.tabfilelist.append(None)
 		self.tablist.append(TextBox())
 		self.tablist[-1].setFont(self.FONT)
+		if len(self.tablist) != 1:
+			self.tablist[-1].setLineWrapMode(QPlainTextEdit.WidgetWidth if self.tablist[-1].lineWrapMode() != QTextEdit.NoWrap else QTextEdit.NoWrap)
+		else:
+			self.tablist[-1].setLineWrapMode(QPlainTextEdit.NoWrap)
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
@@ -252,6 +286,25 @@ class Window(QMainWindow):
 	def on_status_message_changed(self, message):#一時的なステータスメッセージが変更された時のハンドラ
 		if not message:
 			self.statusBar().showMessage("Ready")
+
+	def toggle_wrap(self, checked):#折り返し切替
+		for tab in self.tablist:
+			if checked:
+				tab.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+			else:
+				tab.setLineWrapMode(QPlainTextEdit.NoWrap)
+
+	def open_search_sidebar(self):#サイドバーの検索を開く
+		self.activity_bar.search_btn.click()
+		if not self.sidebar.isVisible():
+			self.sidebar.show()
+		self.sidebar.setCurrentIndex(1)
+
+	def toggle_fullscreen(self, checked):#全画面表示切替
+		if checked:
+			self.showFullScreen()
+		else:
+			self.showNormal()
 
 	def change_theme(self, theme_name):#テーマ変更
 		global STYLE

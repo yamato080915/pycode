@@ -9,8 +9,8 @@ class MenuBar:
 		self.menubar = self.window.menuBar()
 		self.filemenu()
 		self.editmenu()
-		self.viewmenu()
 		self.runmenu()
+		self.viewmenu()
 	
 	def filemenu(self):
 		self.file_menu = self.menubar.addMenu("ファイル(&F)")
@@ -86,11 +86,11 @@ class MenuBar:
 
 		search_action = QAction("検索", self.window)
 		search_action.setShortcut("Ctrl+F")
-		#search_action.triggered.connect(self.window.open_search_bar)
+		search_action.triggered.connect(self.window.open_search_sidebar)
 		
 		replace_action = QAction("置換", self.window)
 		replace_action.setShortcut("Ctrl+H")
-		#replace_action.triggered.connect(self.window.open_replace_bar)
+		replace_action.triggered.connect(self.window.open_search_sidebar)
 
 		self.edit_menu.addAction(undo_action)
 		self.edit_menu.addAction(redo_action)
@@ -107,8 +107,21 @@ class MenuBar:
 	def viewmenu(self):
 		self.view_menu = self.menubar.addMenu("表示(&V)")
 		self.view_menu.setFont(self.window.FONT)
+
+		fullscreen_action = QAction("全画面表示", self.window)
+		fullscreen_action.setShortcut("F11")
+		fullscreen_action.setCheckable(True)
+		fullscreen_action.triggered.connect(self.window.toggle_fullscreen)
+
+		wrap_action = QAction("右端での折り返し", self.window)
+		wrap_action.setCheckable(True)
+		wrap_action.setChecked(self.window.tablist[self.window.tabs.currentIndex()].lineWrapMode() != QTextEdit.NoWrap)
+		wrap_action.triggered.connect(self.window.toggle_wrap)
+
+		self.view_menu.addAction(fullscreen_action)
+		self.view_menu.addAction(wrap_action)
 		
-		self.theme_menu = self.view_menu.addMenu("テーマ")
+		self.theme_menu = self.view_menu.addMenu("配色テーマ")
 		self.theme_menu.setFont(self.window.FONT)
 
 		self.theme_action_group = QActionGroup(self.window)
