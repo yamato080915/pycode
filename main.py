@@ -34,7 +34,7 @@ def change_theme(theme_name):
 	parser = cssutils.CSSParser(validate=False)
 	for rule in parser.parseFile(style["style"]):
 		if rule.type == rule.STYLE_RULE:
-			if rule.selectorText == "QTextEdit":
+			if rule.selectorText == "QPlainTextEdit":
 				color = rule.style.getPropertyValue("color")
 	if not color:color = "#000000"
 	for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):

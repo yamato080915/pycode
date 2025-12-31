@@ -12,6 +12,9 @@
 				"foreground": "#abb2bf",
 				"background": "#21252b"
 			}
+		},
+		"search": {
+			"background": "#3e4451"
 		}
 	},
 	"highlight": {

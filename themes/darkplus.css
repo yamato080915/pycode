@@ -4,7 +4,7 @@ QMainWindow, QWidget {
 	color: #d4d4d4;
 }
 
-QTextEdit {
+QPlainTextEdit {
 	background-color: #1e1e1e;
 	color: #d4d4d4;
 	border: 1px solid #3e3e42;
