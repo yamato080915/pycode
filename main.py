@@ -2,7 +2,7 @@ import sys, os, json, cssutils, logging, threading, time, subprocess
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QFont, QTextOption, QFontMetrics
+from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from Highlight import Highlighter
 from LineNumberTextEdit import LineNumberTextEdit as TextBox
@@ -56,6 +56,10 @@ class Window(QMainWindow):
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
 		self.resize(1600, 900)
+		
+		icon_path = f"{DIR}/assets/pycode.png"
+		if os.path.exists(icon_path):
+			self.setWindowIcon(QIcon(icon_path))
 		
 		self.FONT = QFont("Consolas", 11)
 
@@ -122,7 +126,7 @@ class Window(QMainWindow):
 		threading.Thread(target=self.update_status, daemon=True).start()
 
 	def update_status(self):
-		running = False
+		self.running = False
 		while True:
 			try:
 				disp_text = ""
@@ -147,17 +151,17 @@ class Window(QMainWindow):
 				flag = False
 				if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
 					flag = True
-				if flag and not running:
+				if flag and not self.running:
 					bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
 					fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
 					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
 					self.permanent_message.setStyleSheet(f"color: {fg_color};")
-				elif not flag and running:
+				elif not flag and self.running:
 					bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
 					fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
 					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
 					self.permanent_message.setStyleSheet(f"color: {fg_color};")
-				running = flag
+				self.running = flag
 				time.sleep(0.03)
 			except Exception as e:
 				print("Status Bar Update Error:", e)
@@ -268,6 +272,8 @@ class Window(QMainWindow):
 		self.ConsoleGroup.terminals[0].run_command()
 
 	def run_code(self):#実行
+		if self.running:
+			return
 		current_tab = self.tablist[self.tabs.currentIndex()]
 		if not hasattr(current_tab, 'file_path'):
 			return
