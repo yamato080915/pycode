@@ -20,6 +20,10 @@ class MenuBar:
 		new_action.setShortcut("Ctrl+N")
 		new_action.triggered.connect(lambda: self.window.newtab(name="Untitled"))
 
+		new_win_action = QAction("新しいウィンドウ", self.window)
+		new_win_action.setShortcut("Ctrl+Shift+N")
+		new_win_action.triggered.connect(self.window.new_window)
+
 		open_action = QAction("ファイルを開く...", self.window)
 		open_action.setShortcut("Ctrl+O")
 		open_action.triggered.connect(self.window.open_file)
@@ -46,6 +50,8 @@ class MenuBar:
 		exit_action.triggered.connect(self.window.close)
 
 		self.file_menu.addAction(new_action)
+		self.file_menu.addAction(new_win_action)
+		self.file_menu.addSeparator()
 		self.file_menu.addAction(open_action)
 		self.file_menu.addAction(open_folder_action)
 		self.file_menu.addSeparator()
@@ -128,7 +134,12 @@ class MenuBar:
 		self.theme_action_group.setExclusive(True)
 
 		themes_dir = f"{self.window.DIR}/themes"
-		theme_files = [f for f in os.listdir(themes_dir) if f.endswith('.json')]
+		theme_files = []
+		for root, dirs, files in os.walk(themes_dir):
+			for file in files:
+				if file.endswith('.json'):
+					rel_path = os.path.relpath(os.path.join(root, file), themes_dir)
+					theme_files.append(rel_path)
 		
 		current_theme = self.window.STYLE if isinstance(self.window.STYLE, str) else "monokai"
 		

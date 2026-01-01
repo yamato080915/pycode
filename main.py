@@ -10,16 +10,24 @@ from ActivityBar import ActivityBar
 from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
+import platform
 
 cssutils.log.setLevel(logging.CRITICAL)
 ET.register_namespace("", "http://www.w3.org/2000/svg")
-si = subprocess.STARTUPINFO()
-si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+OS = platform.system()
+if OS == "Windows":
+	si = subprocess.STARTUPINFO()
+	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+	import ctypes
+	ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pycode2')
 
 DIR = os.getcwd()
 embedded_python = f"{DIR}/python/python.exe"
 def getpyversion():
-	PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
+	if OS == "Windows":
+		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
+	else:
+		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True)
 	return PYV.stdout.strip()
 PYV = getpyversion()
 STYLE = "onedarkpro"
@@ -28,7 +36,7 @@ def change_theme(theme_name):
 	with open(f"{DIR}/themes/{theme_name}.json", "r", encoding="utf-8") as f:
 		style = json.load(f)
 	if not "style" in style:
-		style["style"] = "themes/monokai.css"
+		style["style"] = "themes/onedarkpro.css"
 	style["style"] = f"{DIR}/{style["style"]}"
 
 	parser = cssutils.CSSParser(validate=False)
@@ -53,9 +61,16 @@ class Window(QMainWindow):
 		super().__init__()
 		self.STYLE = STYLE
 		self.DIR = DIR
+		
+		self.settings = QSettings("PyCode", "PyCode2")
+		
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
-		self.resize(1600, 900)
+		
+		if self.settings.contains("geometry"):
+			self.restoreGeometry(self.settings.value("geometry"))
+		else:
+			self.resize(1600, 900)
 		
 		icon_path = f"{DIR}/assets/pycode.png"
 		if os.path.exists(icon_path):
@@ -107,9 +122,14 @@ class Window(QMainWindow):
 		horizontal_splitter.setStretchFactor(2, 1)
 
 		self.main_layout.addWidget(horizontal_splitter)
+		
+		self.vertical_splitter = vertical_splitter
+		self.horizontal_splitter = horizontal_splitter
 
 		MenuBar(self)
 		self.create_status_bar()
+		
+		self.load_settings()
 
 	def create_status_bar(self):
 		self.status_bar = self.statusBar()
@@ -214,6 +234,7 @@ class Window(QMainWindow):
 		if folder_path:
 			self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(folder_path))
 			QDir.setCurrent(folder_path)
+			self.settings.setValue("workspace", folder_path)
 			self.ConsoleGroup.add_terminal()
 
 	def save_file(self):#保存
@@ -299,6 +320,7 @@ class Window(QMainWindow):
 				tab.setLineWrapMode(QPlainTextEdit.WidgetWidth)
 			else:
 				tab.setLineWrapMode(QPlainTextEdit.NoWrap)
+		self.settings.setValue("wordWrap", checked)
 
 	def open_search_sidebar(self):#サイドバーの検索を開く
 		self.activity_bar.search_btn.click()
@@ -324,7 +346,46 @@ class Window(QMainWindow):
 			tab.highlighter.style = STYLE["highlight"]
 			tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
 			tab.highlighter.rehighlight()
+		
+		self.settings.setValue("theme", theme_name)
 
+	def load_settings(self):#設定を読み込み
+		if self.settings.contains("theme"):
+			theme_name = self.settings.value("theme")
+			if theme_name:
+				try:
+					self.change_theme(theme_name)
+				except:
+					pass
+		
+		if self.settings.contains("wordWrap"):
+			word_wrap = self.settings.value("wordWrap", type=bool)
+			for tab in self.tablist:
+				if word_wrap:
+					tab.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+				else:
+					tab.setLineWrapMode(QPlainTextEdit.NoWrap)
+		
+		if self.settings.contains("verticalSplitter"):
+			self.vertical_splitter.restoreState(self.settings.value("verticalSplitter"))
+		if self.settings.contains("horizontalSplitter"):
+			self.horizontal_splitter.restoreState(self.settings.value("horizontalSplitter"))
+		
+		if self.settings.contains("workspace"):
+			last_folder = self.settings.value("workspace")
+			if last_folder and os.path.exists(last_folder):
+				self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(last_folder))
+				QDir.setCurrent(last_folder)
+	
+	def save_settings(self):#設定を保存
+		self.settings.setValue("geometry", self.saveGeometry())
+		self.settings.setValue("verticalSplitter", self.vertical_splitter.saveState())
+		self.settings.setValue("horizontalSplitter", self.horizontal_splitter.saveState())
+		
+		current_folder = QDir.currentPath()
+		if current_folder:
+			self.settings.setValue("lastFolder", current_folder)
+	
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
 		for i in range(len(self.tablist)):
@@ -332,13 +393,22 @@ class Window(QMainWindow):
 				can_close = False
 				break
 		if can_close:
-			#終了前処理はここ
+			# 設定を保存
+			self.save_settings()
 			event.accept()
 		else:
 			event.ignore()
+	
+	def new_window(self):
+		if OS == "Windows":
+			subprocess.Popen(
+				[sys.executable, os.path.abspath(__file__)], 
+				startupinfo=si if OS == "Windows" else None
+			)
+		else:
+			subprocess.Popen([sys.executable, os.path.abspath(__file__)])
 
-if __name__=="__main__":
-	app = QApplication(sys.argv)
-	window = Window()
-	window.showMaximized()
-	sys.exit(app.exec())
+app = QApplication(sys.argv)
+window = Window()
+window.showMaximized()
+sys.exit(app.exec())
