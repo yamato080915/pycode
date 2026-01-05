@@ -121,7 +121,7 @@ class MenuBar:
 
 		wrap_action = QAction("右端での折り返し", self.window)
 		wrap_action.setCheckable(True)
-		wrap_action.setChecked(self.window.tablist[self.window.tabs.currentIndex()].lineWrapMode() != QTextEdit.NoWrap)
+		wrap_action.setChecked(self.window.settings.value("wordWrap", False, type=bool))
 		wrap_action.triggered.connect(self.window.toggle_wrap)
 
 		self.view_menu.addAction(fullscreen_action)

@@ -100,7 +100,6 @@ class Window(QMainWindow):
 
 		self.tablist = []
 		self.tabfilelist = []
-		self.newtab(name="Untitled")
 		# -----------------------------------------------------------
 		# 下：コンソール・出力ビュー
 		# -----------------------------------------------------------
@@ -126,10 +125,12 @@ class Window(QMainWindow):
 		self.vertical_splitter = vertical_splitter
 		self.horizontal_splitter = horizontal_splitter
 
+		self.load_settings()
+
 		MenuBar(self)
 		self.create_status_bar()
 		
-		self.load_settings()
+		self.newtab(name="Untitled")
 
 	def create_status_bar(self):
 		self.status_bar = self.statusBar()
@@ -194,13 +195,10 @@ class Window(QMainWindow):
 			self.tabfilelist.append(None)
 		self.tablist.append(TextBox())
 		self.tablist[-1].setFont(self.FONT)
-		if len(self.tablist) != 1:
-			self.tablist[-1].setLineWrapMode(QPlainTextEdit.WidgetWidth if self.tablist[-1].lineWrapMode() != QTextEdit.NoWrap else QTextEdit.NoWrap)
-		else:
-			self.tablist[-1].setLineWrapMode(QPlainTextEdit.NoWrap)
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
+		options.setWrapMode(QTextOption.WrapMode.WordWrap if self.word_wrap else QTextOption.WrapMode.NoWrap)
 		self.tablist[-1].document().setDefaultTextOption(options)
 		self.tablist[-1].highlighter = Highlighter(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
@@ -316,10 +314,13 @@ class Window(QMainWindow):
 
 	def toggle_wrap(self, checked):#折り返し切替
 		for tab in self.tablist:
+			options = QTextOption()
+			options.setTabStopDistance(QFontMetrics(tab.font()).horizontalAdvance(' ') * 4)
 			if checked:
-				tab.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+				options.setWrapMode(QTextOption.WrapMode.WordWrap)
 			else:
-				tab.setLineWrapMode(QPlainTextEdit.NoWrap)
+				options.setWrapMode(QTextOption.WrapMode.NoWrap)
+			tab.document().setDefaultTextOption(options)
 		self.settings.setValue("wordWrap", checked)
 
 	def open_search_sidebar(self):#サイドバーの検索を開く
@@ -346,7 +347,9 @@ class Window(QMainWindow):
 			tab.highlighter.style = STYLE["highlight"]
 			tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
 			tab.highlighter.rehighlight()
-		
+		for btn in self.ConsoleGroup.btn_group.buttons():
+			btn.setIcon(QIcon(f"{self.DIR}/assets/terminal.svg"))
+		self.ConsoleGroup.btn_group.button(self.ConsoleGroup.terminalstack.currentIndex()).setIcon(QIcon(f"{self.DIR}/assets/terminal-fill.svg"))
 		self.settings.setValue("theme", theme_name)
 
 	def load_settings(self):#設定を読み込み
@@ -358,13 +361,7 @@ class Window(QMainWindow):
 				except:
 					pass
 		
-		if self.settings.contains("wordWrap"):
-			word_wrap = self.settings.value("wordWrap", type=bool)
-			for tab in self.tablist:
-				if word_wrap:
-					tab.setLineWrapMode(QPlainTextEdit.WidgetWidth)
-				else:
-					tab.setLineWrapMode(QPlainTextEdit.NoWrap)
+		self.word_wrap = self.settings.value("wordWrap", False, type=bool)
 		
 		if self.settings.contains("verticalSplitter"):
 			self.vertical_splitter.restoreState(self.settings.value("verticalSplitter"))
@@ -384,7 +381,7 @@ class Window(QMainWindow):
 		
 		current_folder = QDir.currentPath()
 		if current_folder:
-			self.settings.setValue("lastFolder", current_folder)
+			self.settings.setValue("workspace", current_folder)
 	
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
