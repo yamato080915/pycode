@@ -1,7 +1,8 @@
 from PySide6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QObject, QThread, Signal
 from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
 from pygments.token import Token, Punctuation, Name
+from pygments.util import ClassNotFound
 import json
 from semantic import *
 
@@ -10,90 +11,23 @@ Punctuation.Bracket.Depth0
 Punctuation.Bracket.Depth1
 Punctuation.Bracket.Depth2
 
-class Highlighter(QSyntaxHighlighter):
-	def __init__(self, window=None, parent=None, filename = "*.txt", style=None):
-		super().__init__(parent)
-		self.win = window
-		self.style = style
-		self.set_filetype(filename)
-		self.token_cache = {}
-		self.use_cache = False
-		
-		self.tokenize_timer = QTimer()
-		self.tokenize_timer.setSingleShot(True)
-		self.tokenize_timer.setInterval(1000)
-		self.tokenize_timer.timeout.connect(self.tokenize)
+class Tokenizer(QObject):
+	finished = Signal(object)  # dictの代わりにobjectを使用
 
-		self.document().contentsChange.connect(self.changed)
+	def __init__(self, text, lexer, replace):
+		super().__init__()
+		self.text = text
+		self.lexer = lexer
+		self.replace = replace
 	
-	def changed(self, position, chars_removed, chars_added):
-		if self.tokenize_timer.isActive():
-			self.use_cache = False
-			
-			doc = self.document()
-			start_block = doc.findBlock(position)
-			end_block = doc.findBlock(position + chars_added)
-			
-			block = start_block
-			while block.isValid() and block.blockNumber() <= end_block.blockNumber():
-				self.rehighlightBlock(block)
-				block = block.next()
-		
-		self.schedule_tokenize()
-	
-	def schedule_tokenize(self):
-		self.tokenize_timer.stop()
-		self.tokenize_timer.start()
-	
-	def set_filetype(self, filename):
-		try:
-			self.lexer = get_lexer_for_filename(filename)
-		except Exception as e:
-			print(f"Error getting lexer for {filename}: {e}")
-			self.lexer = get_lexer_by_name("text")
-		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
-		self.formats = {}
-		self.replace = {}
-		self.setup_formats(lang)
-
-	def setup_formats(self, lang="Text"):
-		if self.style is None:
-			with open(f"{self.win.DIR}/themes/monokai.json", "r") as f:
-				self.style = json.load(f)
-		for token_name, token in (list(self.style["Text"].items()) + (list(self.style[lang].items()) if lang in self.style else [])):
-			token_format = QTextCharFormat()
-			if "Foreground" in token:
-				token_format.setForeground(QColor(token["Foreground"]))
-			if "FontStyle" in token:
-				if "bold" in token["FontStyle"]:
-					token_format.setFontWeight(QFont.Weight.Bold)
-				if "italic" in token["FontStyle"]:
-					token_format.setFontItalic(True)
-			if "Replace" in token:
-				self.replace[token_name] = []
-				for i, j in token["Replace"]:
-					t = Token
-					for x in j.split('.'):
-						t = getattr(t, x)
-					self.replace[token_name].append((tuple(i), t))
-				self.replace[token_name] = tuple(self.replace[token_name])
-						
-			token = Token
-			for part in token_name.split('.'):
-				token = getattr(token, part)
-			self.formats[token] = token_format
-	
-	def tokenize(self):
-		self.document().contentsChange.disconnect(self.changed)
-		
-		text = self.document().toPlainText()
-		tokens = list(self.lexer.get_tokens(text))
+	def run(self):
+		tokens = list(self.lexer.get_tokens(self.text))
 		num = 0
 		offset = 0
 		cache = []
-		self.token_cache.clear()
+		token_cache = {}
 		brackets = 0
-		semantic_analyzer = Semantic(text)
+		semantic_analyzer = Semantic(self.text)
 		modules = semantic_analyzer.modules
 		imported = semantic_analyzer.imported
 		modulefiles = {}
@@ -119,7 +53,7 @@ class Highlighter(QSyntaxHighlighter):
 						offset += len(line)
 					
 					if i < len(lines) - 1:
-						self.token_cache[num] = cache
+						token_cache[num] = cache
 						num += 1
 						cache = []
 						offset = 0
@@ -188,8 +122,105 @@ class Highlighter(QSyntaxHighlighter):
 			index += 1
 		
 		if cache:
-			self.token_cache[num] = cache
+			token_cache[num] = cache
+		self.finished.emit(token_cache)
+
+class Highlighter(QSyntaxHighlighter):
+	def __init__(self, window=None, parent=None, filename = "*.txt", style=None):
+		super().__init__(parent)
+		self.win = window
+		self.style = style
+		self.set_filetype(filename)
+		self.token_cache = {}
+		self.use_cache = False
 		
+		self.tokenize_timer = QTimer()
+		self.tokenize_timer.setSingleShot(True)
+		self.tokenize_timer.setInterval(1000)
+		self.tokenize_timer.timeout.connect(self.tokenize)
+
+		self.document().contentsChange.connect(self.changed)
+		self.tokenize_thread = None
+		self.tokenize_worker = None
+	
+	def changed(self, position, chars_removed, chars_added):
+		if self.tokenize_timer.isActive():
+			self.use_cache = False
+			
+			doc = self.document()
+			start_block = doc.findBlock(position)
+			end_block = doc.findBlock(position + chars_added)
+			
+			block = start_block
+			while block.isValid() and block.blockNumber() <= end_block.blockNumber():
+				self.rehighlightBlock(block)
+				block = block.next()
+		
+		self.schedule_tokenize()
+	
+	def schedule_tokenize(self):
+		self.tokenize_timer.stop()
+		self.tokenize_timer.start()
+	
+	def set_filetype(self, filename):
+		try:
+			self.lexer = get_lexer_for_filename(filename)
+		except ClassNotFound:
+			self.lexer = get_lexer_by_name("text")
+		except Exception as e:
+			print(f"Error getting lexer for {filename}: {e}")
+			self.lexer = get_lexer_by_name("text")
+		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
+		self.formats = {}
+		self.replace = {}
+		self.setup_formats(lang)
+
+	def setup_formats(self, lang="Text"):
+		if self.style is None:
+			with open(f"{self.win.DIR}/themes/monokai.json", "r") as f:
+				self.style = json.load(f)
+		for token_name, token in (list(self.style["Text"].items()) + (list(self.style[lang].items()) if lang in self.style else [])):
+			token_format = QTextCharFormat()
+			if "Foreground" in token:
+				token_format.setForeground(QColor(token["Foreground"]))
+			if "FontStyle" in token:
+				if "bold" in token["FontStyle"]:
+					token_format.setFontWeight(QFont.Weight.Bold)
+				if "italic" in token["FontStyle"]:
+					token_format.setFontItalic(True)
+			if "Replace" in token:
+				self.replace[token_name] = []
+				for i, j in token["Replace"]:
+					t = Token
+					for x in j.split('.'):
+						t = getattr(t, x)
+					self.replace[token_name].append((tuple(i), t))
+				self.replace[token_name] = tuple(self.replace[token_name])
+						
+			token = Token
+			for part in token_name.split('.'):
+				token = getattr(token, part)
+			self.formats[token] = token_format
+	
+	def tokenize(self):
+		self.document().contentsChange.disconnect(self.changed)
+		
+		text = self.document().toPlainText()
+		self.token_cache.clear()
+		
+		self.tokenize_thread = QThread()
+		self.tokenize_worker = Tokenizer(text, self.lexer, self.replace)
+		self.tokenize_worker.moveToThread(self.tokenize_thread)
+		self.tokenize_thread.started.connect(self.tokenize_worker.run)
+		self.tokenize_worker.finished.connect(self.on_tokenize_finished)
+		self.tokenize_worker.finished.connect(self.tokenize_thread.quit)
+		self.tokenize_worker.finished.connect(self.tokenize_worker.deleteLater)
+		self.tokenize_thread.finished.connect(self.tokenize_thread.deleteLater)
+
+		self.tokenize_thread.start()
+	def on_tokenize_finished(self, token_cache):
+		self.token_cache = token_cache
+
 		self.use_cache = True
 		self.rehighlight()
 		self.document().contentsChange.connect(self.changed)

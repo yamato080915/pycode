@@ -183,9 +183,14 @@ class Window(QMainWindow):
 					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
 					self.permanent_message.setStyleSheet(f"color: {fg_color};")
 				self.running = flag
-				time.sleep(0.03)
+			except IndexError:
+				pass
+			except RuntimeError:
+				pass
 			except Exception as e:
 				print("Status Bar Update Error:", e)
+			finally:
+				time.sleep(0.03)
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
 		if path is not None:
@@ -212,6 +217,7 @@ class Window(QMainWindow):
 				self.newtab(path=file_path)
 				current_tab = self.tablist[-1]
 				current_tab.setPlainText(content)
+				current_tab.highlighter.tokenize()
 				current_tab.file_path = file_path
 		except UnicodeDecodeError:
 			QMessageBox.warning(self, "警告", "このファイルはテキストファイルではないか、対応していないエンコーディングです。")
