@@ -34,12 +34,12 @@ class Tokenizer(QObject):
 		for key in modules.keys():
 			file = get_module_file(key)
 			if file:
-				with open(file, 'r', encoding='utf-8') as f:
+				with open(file, 'r', encoding='utf-8', errors='ignore') as f:
 					modulefiles[key] = Semantic(f.read())
 			for value in modules[key].keys():
 				file = get_module_file(f"{value}")
 				if file:
-					with open(file, 'r', encoding='utf-8') as f:
+					with open(file, 'r', encoding='utf-8', errors='ignore') as f:
 						modulefiles[value] = Semantic(f.read())
 		index = 0
 		for token, value in tokens:

@@ -15,14 +15,17 @@ import platform
 cssutils.log.setLevel(logging.CRITICAL)
 ET.register_namespace("", "http://www.w3.org/2000/svg")
 OS = platform.system()
+DIR = os.getcwd()
+
 if OS == "Windows":
 	si = subprocess.STARTUPINFO()
 	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	import ctypes
 	ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pycode2')
+	embedded_python = f"{DIR}/python/python.exe"
+else:
+	embedded_python = f"python3"
 
-DIR = os.getcwd()
-embedded_python = f"{DIR}/python/python.exe"
 def getpyversion():
 	if OS == "Windows":
 		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
