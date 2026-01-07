@@ -4,7 +4,7 @@ from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
 from pygments.token import Token, Punctuation, Name
 from pygments.util import ClassNotFound
 import json
-from semantic import *
+from Semantic import *
 
 Punctuation.Bracket
 Punctuation.Bracket.Depth0
@@ -79,10 +79,9 @@ class Tokenizer(QObject):
 				elif token == Name:
 					kind = None
 					kind_type = "symbol"
-					if self.lexer == get_lexer_by_name("Python"):
+					if self.lexer.name == "Python":
 						kind_type = "module"
-						block = self.document().findBlockByNumber(num)
-						lineno = block.blockNumber() + 1
+						lineno = num + 1
 						kind = set(module.lookup(value, lineno) for module in modulefiles.values())
 						kind.discard(None)
 						if len(kind) == 1:
@@ -93,7 +92,7 @@ class Tokenizer(QObject):
 					token_ = None
 					if kind == SymbolKind.Class:
 						token_ = Name.Class
-					if index > 0 and not token_ and kind != SymbolKind.Class:
+					elif index > 0:
 						prev_token, prev_value = tokens[index - 1]
 						if prev_value == '.':
 							next_token, next_value = tokens[index + 1] if index + 1 < len(tokens) else (None, None)
