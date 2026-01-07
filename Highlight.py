@@ -12,7 +12,7 @@ Punctuation.Bracket.Depth1
 Punctuation.Bracket.Depth2
 
 class Tokenizer(QObject):
-	finished = Signal(object)  # dictの代わりにobjectを使用
+	finished = Signal(object)
 
 	def __init__(self, text, lexer, replace):
 		super().__init__()
@@ -36,11 +36,6 @@ class Tokenizer(QObject):
 			if file:
 				with open(file, 'r', encoding='utf-8', errors='ignore') as f:
 					modulefiles[key] = Semantic(f.read())
-			for value in modules[key].keys():
-				file = get_module_file(f"{value}")
-				if file:
-					with open(file, 'r', encoding='utf-8', errors='ignore') as f:
-						modulefiles[value] = Semantic(f.read())
 		index = 0
 		for token, value in tokens:
 			if value in (')', '}', ']') and token == Punctuation:
@@ -99,7 +94,7 @@ class Tokenizer(QObject):
 							if next_value == "(":
 								token_ = Name.Function
 					if not token_:
-						if kind == SymbolKind.Function:
+						if kind == SymbolKind.Function and (tokens[index + 1][1] if index + 1 < len(tokens) else None) == "(":
 							token_ = Name.Function
 						elif kind == SymbolKind.Variable:
 							if value.upper() == value and kind_type == "symbol":

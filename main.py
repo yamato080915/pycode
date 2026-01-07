@@ -196,6 +196,11 @@ class Window(QMainWindow):
 				time.sleep(0.03)
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
+		if len(self.tabfilelist) == 1 and self.tabfilelist[0] == None and self.maybe_save(0):
+			self.tabs.removeTab(0)
+			self.tablist.pop(0)
+			self.tabfilelist.pop(0)
+		
 		if path is not None:
 			name = QFileInfo(path).fileName()
 			self.tabfilelist.append(path)
