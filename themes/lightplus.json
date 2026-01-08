@@ -1,0 +1,112 @@
+{
+	"name": "Light+ (VS Code Default Light)",
+	"type": "style",
+	"style": "themes/lightplus.css",
+	"theme": {
+		"status_bar": {
+			"running": {
+				"foreground": "#FFFFFF",
+				"background": "#af00db"
+			},
+			"normal": {
+				"foreground": "#ffffff",
+				"background": "#007acc"
+			}
+		},
+		"search": {
+			"background": "#add6ff"
+		}
+	},
+	"highlight": {
+		"Text": {
+			"Keyword": {"Foreground": "#0000ff"},
+			"Keyword.Namespace": {"Foreground": "#0000ff"},
+			"Keyword.Constant": {"Foreground": "#0000ff"},
+			"Keyword.Declaration": {"Foreground": "#0000ff"},
+			"Keyword.Reserved": {"Foreground": "#0000ff"},
+			"Keyword.Type": {"Foreground": "#267f99"},
+			"Operator": {"Foreground": "#000000"},
+			"Operator.Word": {"Foreground": "#0000ff"},
+			"Comment": {"Foreground": "#008000"},
+			"Comment.Multiline": {"Foreground": "#008000"},
+			"Literal.String": {"Foreground": "#a31515"},
+			"Literal.String.Double": {"Foreground": "#a31515"},
+			"Literal.String.Single": {"Foreground": "#a31515"},
+			"Literal.String.Backtick": {"Foreground": "#a31515"},
+			"Literal.String.Char": {"Foreground": "#a31515"},
+			"Literal.String.Escape": {"Foreground": "#ee0000"},
+			"Literal.String.Affix": {"Foreground": "#0000ff"},
+			"Literal.String.Interpol": {"Foreground": "#0000ff"},
+			"Literal.Number.Integer": {"Foreground": "#098658"},
+			"Literal.Number.Float": {"Foreground": "#098658"},
+			"Literal.Number.Hex": {"Foreground": "#098658"},
+			"Name.Class": {"Foreground": "#267f99"},
+			"Name.Function": {"Foreground": "#795e26"},
+			"Punctuation.Bracket": {"Foreground": "#0431fa"},
+			"Punctuation.Bracket.Depth0": {"Foreground": "#0431fa"},
+			"Punctuation.Bracket.Depth1": {"Foreground": "#319331"},
+			"Punctuation.Bracket.Depth2": {"Foreground": "#7b3814"}
+		},
+		"Css": {
+			"Name.Namespace": {"Foreground": "#a31515"},
+			"Name.Tag": {"Foreground": "#800000"},
+			"Name.Decorator": {"Foreground": "#267f99"}
+		},
+		"Json": {
+			"Name.Tag": {"Foreground": "#001080"}
+		},
+		"Markdown": {
+			"Keyword": {"Foreground": "#0000ff"},
+			"Generic.Heading": {"Foreground": "#0000ff"},
+			"Generic.Subheading": {"Foreground": "#0000ff"},
+			"Name.Tag": {"Foreground": "#800000"},
+			"Name.Attribute": {"Foreground": "#ff0000"},
+			"Name.Label": {"Foreground": "#a31515"}
+		},
+		"Python": {
+			"Name": {"Foreground": "#001080"},
+			"Name.Constant": {"Foreground": "#0070c1"},
+			"Name.Namespace": {"Foreground": "#267f99"},
+			"Name.Builtin": {
+				"Foreground": "#0000ff",
+				"Replace": [
+					[
+						["int", "float", "complex", "bool", "list", "tuple", "range", "str", "bytes", "bytearray", "memoryview", "set", "frozenset", "dict", "type", "object", "classmethod", "staticmethod", "super", "property"], 
+						"Name.Builtin.Pseudo"
+					]
+				]
+			},
+			"Name.Function.Magic": {"Foreground": "#795e26"},
+			"Name.Builtin.Pseudo": {"Foreground": "#267f99"},
+			"Name.Exception": {"Foreground": "#267f99"},
+			"Name.Variable.Magic": {"Foreground": "#001080"}
+		},
+		"C": {
+			"Comment.Preproc": {"Foreground": "#af00db"},
+			"Comment.PreprocFile": {"Foreground": "#a31515"},
+			"Operator": {"Foreground": "#000000"},
+			"Name": {"Foreground": "#001080"},
+			"Name.Builtin": {"Foreground": "#267f99"}
+		},
+		"Cpp": {
+			"Comment.Preproc": {"Foreground": "#af00db"},
+			"Comment.PreprocFile": {"Foreground": "#a31515"},
+			"Name": {"Foreground": "#001080"},
+			"Name.Namespace": {"Foreground": "#267f99"},
+			"Name.Builtin": {"Foreground": "#267f99"},
+			"Operator": {"Foreground": "#000000"}
+		}, 
+		"CSharp": {
+			"Name": {"Foreground": "#001080"},
+			"Name.Namespace": {"Foreground": "#267f99"},
+			"Name.Attribute": {"Foreground": "#267f99"}
+		},
+		"Java": {
+			"Name": {"Foreground": "#001080"},
+			"Name.Namespace": {"Foreground": "#267f99"},
+			"Name.Declaration": {"Foreground": "#0000ff"},
+			"Name.Attribute": {"Foreground": "#795e26"},
+			"Name.Decorator": {"Foreground": "#267f99"}
+		}
+	}
+}

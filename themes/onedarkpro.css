@@ -4,7 +4,7 @@ QMainWindow, QWidget {
 	color: #abb2bf;
 }
 
-QTextEdit {
+QPlainTextEdit {
 	background-color: #282c34;
 	color: #abb2bf;
 	border: 1px solid #3e4451;
@@ -12,7 +12,7 @@ QTextEdit {
 	selection-color: #abb2bf;
 }
 
-QTreeView {
+#explorer {
 	background-color: #21252b;
 	color: #abb2bf;
 	border: 1px solid #3e4451;
@@ -20,11 +20,11 @@ QTreeView {
 	alternate-background-color: #282c34;
 }
 
-QTreeView::item:hover {
+#explorer QTreeView::item:hover {
 	background-color: #2c313c;
 }
 
-QTreeView::item:selected {
+#explorer QTreeView::item:selected {
 	background-color: #2c313c;
 	color: #abb2bf;
 }
@@ -84,6 +84,10 @@ QMenu::separator {
 	background-color: #21252b;
 	color: #5c6370;
 	border-top: 1px solid #3e4451;
+}
+
+#status_bar QLabel {
+	background-color: transparent;
 }
 
 QSplitter::handle {

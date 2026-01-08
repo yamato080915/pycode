@@ -1,48 +1,83 @@
-import sys, os, json, cssutils, logging, threading, time
+import sys, os, json, cssutils, logging, threading, time, subprocess
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QFont, QTextOption, QFontMetrics
+from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
-from SyntaxHighlight import PygmentsSyntaxHighlight
+from Highlight import Highlighter
 from LineNumberTextEdit import LineNumberTextEdit as TextBox
 from ActivityBar import ActivityBar
 from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
-
-DIR = os.getcwd()
-embedded_python = f"{DIR}/python/python.exe"
-STYLE = "onedarkpro"
-with open(f"{DIR}/themes/{STYLE}.json", "r", encoding="utf-8") as f:
-	STYLE = json.load(f)
-if not "style" in STYLE:
-	STYLE["style"] = "themes/monokai.css"
-STYLE["style"] = f"{DIR}/{STYLE["style"]}"
+import platform
 
 cssutils.log.setLevel(logging.CRITICAL)
-parser = cssutils.CSSParser(validate=False)
-for rule in parser.parseFile(STYLE["style"]):
-	if rule.type == rule.STYLE_RULE:
-		if rule.selectorText == "QTextEdit":
-			color = rule.style.getPropertyValue("color")
-if not color:color = "#000000"
 ET.register_namespace("", "http://www.w3.org/2000/svg")
-for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
-	tree = ET.parse(f"{DIR}/assets/{i}")
-	root = tree.getroot()
-	for elem in root.iter():
-		if 'fill' in elem.attrib:
-			elem.attrib['fill'] = color
-	tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
-	
+OS = platform.system()
+DIR = os.getcwd()
+
+if OS == "Windows":
+	si = subprocess.STARTUPINFO()
+	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
+	import ctypes
+	ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pycode2')
+	embedded_python = f"{DIR}/python/python.exe"
+else:
+	embedded_python = f"python3"
+
+def getpyversion():
+	if OS == "Windows":
+		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
+	else:
+		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True)
+	return PYV.stdout.strip()
+PYV = getpyversion()
+STYLE = "onedarkpro"
+
+def change_theme(theme_name):
+	with open(f"{DIR}/themes/{theme_name}.json", "r", encoding="utf-8") as f:
+		style = json.load(f)
+	if not "style" in style:
+		style["style"] = "themes/onedarkpro.css"
+	style["style"] = f"{DIR}/{style["style"]}"
+
+	parser = cssutils.CSSParser(validate=False)
+	for rule in parser.parseFile(style["style"]):
+		if rule.type == rule.STYLE_RULE:
+			if rule.selectorText == "QPlainTextEdit":
+				color = rule.style.getPropertyValue("color")
+	if not color:color = "#000000"
+	for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
+		tree = ET.parse(f"{DIR}/assets/{i}")
+		root = tree.getroot()
+		for elem in root.iter():
+			if 'fill' in elem.attrib:
+				elem.attrib['fill'] = color
+		tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
+	return style
+
+STYLE = change_theme(STYLE)
+
 class Window(QMainWindow):
 	def __init__(self):
-		super().__init__()		
+		super().__init__()
+		self.STYLE = STYLE
 		self.DIR = DIR
+		
+		self.settings = QSettings("PyCode", "PyCode2")
+		
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 		self.setWindowTitle(f"PyCode2")
-		self.resize(1600, 900)
+		
+		if self.settings.contains("geometry"):
+			self.restoreGeometry(self.settings.value("geometry"))
+		else:
+			self.resize(1600, 900)
+		
+		icon_path = f"{DIR}/assets/pycode.png"
+		if os.path.exists(icon_path):
+			self.setWindowIcon(QIcon(icon_path))
 		
 		self.FONT = QFont("Consolas", 11)
 
@@ -68,7 +103,6 @@ class Window(QMainWindow):
 
 		self.tablist = []
 		self.tabfilelist = []
-		self.newtab(name="Untitled")
 		# -----------------------------------------------------------
 		# 下：コンソール・出力ビュー
 		# -----------------------------------------------------------
@@ -90,9 +124,16 @@ class Window(QMainWindow):
 		horizontal_splitter.setStretchFactor(2, 1)
 
 		self.main_layout.addWidget(horizontal_splitter)
+		
+		self.vertical_splitter = vertical_splitter
+		self.horizontal_splitter = horizontal_splitter
+
+		self.load_settings()
 
 		MenuBar(self)
 		self.create_status_bar()
+		
+		self.newtab(name="Untitled")
 
 	def create_status_bar(self):
 		self.status_bar = self.statusBar()
@@ -101,7 +142,7 @@ class Window(QMainWindow):
 
 		self.permanent_message = QLabel()
 		self.permanent_message.setFont(self.FONT)
-		self.permanent_message.setText("Coming Soon")
+		self.permanent_message.setContentsMargins(0,0,10,0)
 		
 		self.status_bar.addPermanentWidget(self.permanent_message)
 
@@ -109,19 +150,57 @@ class Window(QMainWindow):
 		threading.Thread(target=self.update_status, daemon=True).start()
 
 	def update_status(self):
-		running = False
+		self.running = False
 		while True:
-			flag = False
-			if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
-				flag = True
-			if flag and not running:
-				self.status_bar.setStyleSheet("#status_bar {background-color: " + STYLE["theme"]["status_bar"]["running"]["background"] + "; color: " + STYLE["theme"]["status_bar"]["running"]["foreground"] + ";}")
-			elif not flag and running:
-				self.status_bar.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
-			running = flag
-			time.sleep(0.1)
+			try:
+				disp_text = ""
+				current_tab = self.tablist[self.tabs.currentIndex()]
+
+				cursor = current_tab.textCursor()
+				line = cursor.blockNumber() + 1
+				column = cursor.columnNumber() + 1
+				disp_text += f"Ln {line}, Col {column}"
+				if cursor.hasSelection():
+					selection_start = cursor.selectionStart()
+					selection_end = cursor.selectionEnd()
+					selection_length = selection_end - selection_start
+					disp_text += f"(Sel {selection_length})"
+
+				if hasattr(current_tab, 'file_path'):
+					lang = str(current_tab.highlighter.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
+					disp_text += " | " + (f"{PYV}" if lang == "Python" else lang)
+				
+				self.permanent_message.setText(disp_text)
+				
+				flag = False
+				if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
+					flag = True
+				if flag and not self.running:
+					bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
+					fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
+					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
+					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+				elif not flag and self.running:
+					bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
+					fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
+					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
+					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+				self.running = flag
+			except IndexError:
+				pass
+			except RuntimeError:
+				pass
+			except Exception as e:
+				print("Status Bar Update Error:", e)
+			finally:
+				time.sleep(0.03)
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
+		if len(self.tabfilelist) == 1 and self.tabfilelist[0] == None and self.maybe_save(0):
+			self.tabs.removeTab(0)
+			self.tablist.pop(0)
+			self.tabfilelist.pop(0)
+		
 		if path is not None:
 			name = QFileInfo(path).fileName()
 			self.tabfilelist.append(path)
@@ -132,8 +211,9 @@ class Window(QMainWindow):
 		
 		options = QTextOption()
 		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
+		options.setWrapMode(QTextOption.WrapMode.WordWrap if self.word_wrap else QTextOption.WrapMode.NoWrap)
 		self.tablist[-1].document().setDefaultTextOption(options)
-		self.tablist[-1].highlighter = PygmentsSyntaxHighlight(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
+		self.tablist[-1].highlighter = Highlighter(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
@@ -145,6 +225,7 @@ class Window(QMainWindow):
 				self.newtab(path=file_path)
 				current_tab = self.tablist[-1]
 				current_tab.setPlainText(content)
+				current_tab.highlighter.tokenize()
 				current_tab.file_path = file_path
 		except UnicodeDecodeError:
 			QMessageBox.warning(self, "警告", "このファイルはテキストファイルではないか、対応していないエンコーディングです。")
@@ -165,6 +246,7 @@ class Window(QMainWindow):
 		if folder_path:
 			self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(folder_path))
 			QDir.setCurrent(folder_path)
+			self.settings.setValue("workspace", folder_path)
 			self.ConsoleGroup.add_terminal()
 
 	def save_file(self):#保存
@@ -223,6 +305,8 @@ class Window(QMainWindow):
 		self.ConsoleGroup.terminals[0].run_command()
 
 	def run_code(self):#実行
+		if self.running:
+			return
 		current_tab = self.tablist[self.tabs.currentIndex()]
 		if not hasattr(current_tab, 'file_path'):
 			return
@@ -242,6 +326,77 @@ class Window(QMainWindow):
 		if not message:
 			self.statusBar().showMessage("Ready")
 
+	def toggle_wrap(self, checked):#折り返し切替
+		for tab in self.tablist:
+			options = QTextOption()
+			options.setTabStopDistance(QFontMetrics(tab.font()).horizontalAdvance(' ') * 4)
+			if checked:
+				options.setWrapMode(QTextOption.WrapMode.WordWrap)
+			else:
+				options.setWrapMode(QTextOption.WrapMode.NoWrap)
+			tab.document().setDefaultTextOption(options)
+		self.settings.setValue("wordWrap", checked)
+
+	def open_search_sidebar(self):#サイドバーの検索を開く
+		self.activity_bar.search_btn.click()
+		if not self.sidebar.isVisible():
+			self.sidebar.show()
+		self.sidebar.setCurrentIndex(1)
+
+	def toggle_fullscreen(self, checked):#全画面表示切替
+		if checked:
+			self.showFullScreen()
+		else:
+			self.showNormal()
+
+	def change_theme(self, theme_name):#テーマ変更
+		global STYLE
+		STYLE = change_theme(theme_name)
+		self.STYLE = STYLE
+		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
+
+		for tab in self.tablist:
+			tab.highlighter.formats.clear()
+			tab.highlighter.replace.clear()
+			tab.highlighter.style = STYLE["highlight"]
+			tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
+			tab.highlighter.rehighlight()
+		for btn in self.ConsoleGroup.btn_group.buttons():
+			btn.setIcon(QIcon(f"{self.DIR}/assets/terminal.svg"))
+		self.ConsoleGroup.btn_group.button(self.ConsoleGroup.terminalstack.currentIndex()).setIcon(QIcon(f"{self.DIR}/assets/terminal-fill.svg"))
+		self.settings.setValue("theme", theme_name)
+
+	def load_settings(self):#設定を読み込み
+		if self.settings.contains("theme"):
+			theme_name = self.settings.value("theme")
+			if theme_name:
+				try:
+					self.change_theme(theme_name)
+				except:
+					pass
+		
+		self.word_wrap = self.settings.value("wordWrap", False, type=bool)
+		
+		if self.settings.contains("verticalSplitter"):
+			self.vertical_splitter.restoreState(self.settings.value("verticalSplitter"))
+		if self.settings.contains("horizontalSplitter"):
+			self.horizontal_splitter.restoreState(self.settings.value("horizontalSplitter"))
+		
+		if self.settings.contains("workspace"):
+			last_folder = self.settings.value("workspace")
+			if last_folder and os.path.exists(last_folder):
+				self.sidebar.explorer.setRootIndex(self.sidebar.explorer.file_model.index(last_folder))
+				QDir.setCurrent(last_folder)
+	
+	def save_settings(self):#設定を保存
+		self.settings.setValue("geometry", self.saveGeometry())
+		self.settings.setValue("verticalSplitter", self.vertical_splitter.saveState())
+		self.settings.setValue("horizontalSplitter", self.horizontal_splitter.saveState())
+		
+		current_folder = QDir.currentPath()
+		if current_folder:
+			self.settings.setValue("workspace", current_folder)
+	
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
 		for i in range(len(self.tablist)):
@@ -249,13 +404,22 @@ class Window(QMainWindow):
 				can_close = False
 				break
 		if can_close:
-			#終了前処理はここ
+			# 設定を保存
+			self.save_settings()
 			event.accept()
 		else:
 			event.ignore()
+	
+	def new_window(self):
+		if OS == "Windows":
+			subprocess.Popen(
+				[sys.executable, os.path.abspath(__file__)], 
+				startupinfo=si if OS == "Windows" else None
+			)
+		else:
+			subprocess.Popen([sys.executable, os.path.abspath(__file__)])
 
-if __name__=="__main__":
-	app = QApplication(sys.argv)
-	window = Window()
-	window.showMaximized()
-	sys.exit(app.exec()) 
+app = QApplication(sys.argv)
+window = Window()
+window.showMaximized()
+sys.exit(app.exec())

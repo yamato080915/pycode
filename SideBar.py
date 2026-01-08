@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from Explorer import Explorer
+from Search import Search
 #from main import window as win
 
 class SideBar(QStackedWidget):
@@ -11,7 +12,7 @@ class SideBar(QStackedWidget):
 		self.explorer = Explorer(window)
 		self.addWidget(self.explorer)
 
-		self.addWidget(QWidget())
+		self.addWidget(Search(window))
 
 		self.setCurrentIndex(0)
 

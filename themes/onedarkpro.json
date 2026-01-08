@@ -3,10 +3,19 @@
 	"type": "style",
 	"style": "themes/onedarkpro.css",
 	"theme": {
-		"status_bar": {"running": {
-			"foreground": "#FFFFFF",
-			"background": "#CC6633"
-		}}
+		"status_bar": {
+			"running": {
+				"foreground": "#FFFFFF",
+				"background": "#CC6633"
+			},
+			"normal": {
+				"foreground": "#abb2bf",
+				"background": "#21252b"
+			}
+		},
+		"search": {
+			"background": "#3e4451"
+		}
 	},
 	"highlight": {
 		"Text": {
@@ -56,6 +65,7 @@
 		},
 		"Python": {
 			"Name": {"Foreground": "#E06C75"},
+			"Name.Constant": {"Foreground": "#E5C07B"},
 			"Name.Namespace": {"Foreground": "#E5C07B"},
 			"Name.Builtin": {
 				"Foreground": "#61AFEF",
