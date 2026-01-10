@@ -2,7 +2,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 
 class ActivityBar(QWidget):
-	def __init__(self, window=None):
+	def __init__(self, window=None, addons=[]):
 		super().__init__()
 		self.setObjectName("activity_bar")
 		
@@ -20,6 +20,12 @@ class ActivityBar(QWidget):
 
 		self.bar_layout.addWidget(self.explorer_btn)
 		self.bar_layout.addWidget(self.search_btn)
+		self.addonbtn = []
+		for i in addons:
+			addon = i(window)
+			btn = addon.button()
+			self.bar_layout.addWidget(btn)
+			self.addonbtn.append(btn)
 		self.bar_layout.addStretch()
 
 	def explorer(self):

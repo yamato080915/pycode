@@ -11,9 +11,9 @@ from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
 import platform
+from AddonManager import AddonManager
+from Color import css_color, icon_color
 
-cssutils.log.setLevel(logging.CRITICAL)
-ET.register_namespace("", "http://www.w3.org/2000/svg")
 OS = platform.system()
 DIR = os.getcwd()
 
@@ -41,20 +41,9 @@ def change_theme(theme_name):
 	if not "style" in style:
 		style["style"] = "themes/onedarkpro.css"
 	style["style"] = f"{DIR}/{style["style"]}"
-
-	parser = cssutils.CSSParser(validate=False)
-	for rule in parser.parseFile(style["style"]):
-		if rule.type == rule.STYLE_RULE:
-			if rule.selectorText == "QPlainTextEdit":
-				color = rule.style.getPropertyValue("color")
-	if not color:color = "#000000"
+	color = css_color(style)
 	for i in iter(p.name for p in Path(f"{DIR}/assets").iterdir() if p.is_file() and p.suffix.lower() == ".svg"):
-		tree = ET.parse(f"{DIR}/assets/{i}")
-		root = tree.getroot()
-		for elem in root.iter():
-			if 'fill' in elem.attrib:
-				elem.attrib['fill'] = color
-		tree.write(f"{DIR}/assets/{i}", encoding="utf-8", xml_declaration=False)
+		icon_color(f"{DIR}/assets/{i}", color)
 	return style
 
 STYLE = change_theme(STYLE)
@@ -81,6 +70,8 @@ class Window(QMainWindow):
 		
 		self.FONT = QFont("Consolas", 11)
 
+		self.addon_manager = AddonManager(self)
+
 		self.main_widget = QWidget()
 		self.setCentralWidget(self.main_widget)
 		self.main_layout = QVBoxLayout(self.main_widget)
@@ -92,8 +83,8 @@ class Window(QMainWindow):
 		# -----------------------------------------------------------
 		# アクティビティバー
 		# -----------------------------------------------------------
-		self.activity_bar = ActivityBar(self)
-		self.sidebar = SideBar(self)
+		self.activity_bar = ActivityBar(self, self.addon_manager.addons["ActivityBar"])
+		self.sidebar = SideBar(self, self.addon_manager.addons["SideBar"])
 		# -----------------------------------------------------------
 		# テキストエディタ部
 		# -----------------------------------------------------------
@@ -418,8 +409,8 @@ class Window(QMainWindow):
 			)
 		else:
 			subprocess.Popen([sys.executable, os.path.abspath(__file__)])
-
-app = QApplication(sys.argv)
-window = Window()
-window.showMaximized()
-sys.exit(app.exec())
+if __name__ == "__main__":
+	app = QApplication(sys.argv)
+	window = Window()
+	window.showMaximized()
+	sys.exit(app.exec())

@@ -2,4 +2,4 @@ python/
 __pycache__/
 themes/ignore
 assets/
-addons/
+addons/*/
