@@ -5,7 +5,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from Highlight import Highlighter
-from LineNumberTextEdit import LineNumberTextEdit as TextBox
+from Editor import Editor
 from ActivityBar import ActivityBar
 from SideBar import SideBar
 from MenuBar import MenuBar
@@ -206,7 +206,7 @@ class Window(QMainWindow):
 			self.tabfilelist.append(path)
 		else:
 			self.tabfilelist.append(None)
-		self.tablist.append(TextBox())
+		self.tablist.append(Editor())
 		self.tablist[-1].setFont(self.FONT)
 		
 		options = QTextOption()
