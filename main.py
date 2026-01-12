@@ -1,6 +1,5 @@
-import sys, os, json, cssutils, logging, threading, time, subprocess
+import sys, os, json, threading, time, subprocess
 from pathlib import Path
-import xml.etree.ElementTree as ET
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
@@ -10,6 +9,7 @@ from ActivityBar import ActivityBar
 from SideBar import SideBar
 from MenuBar import MenuBar
 from TerminalGroup import TerminalGroup
+from SecondarySideBar import SecondarySideBar
 import platform
 from AddonManager import AddonManager
 from Color import css_color, icon_color
@@ -99,6 +99,10 @@ class Window(QMainWindow):
 		# -----------------------------------------------------------
 		self.ConsoleGroup = TerminalGroup(self)
 		# -----------------------------------------------------------
+		# 右：セカンダリサイドバー
+		# -----------------------------------------------------------
+		self.sec_sidebar = SecondarySideBar(self, self.addon_manager.addons["SecondarySideBar"])
+		# -----------------------------------------------------------
 		# スプリッター
 		# -----------------------------------------------------------
 		vertical_splitter.addWidget(self.tabs)
@@ -110,9 +114,11 @@ class Window(QMainWindow):
 		horizontal_splitter.addWidget(self.activity_bar)
 		horizontal_splitter.addWidget(self.sidebar)
 		horizontal_splitter.addWidget(vertical_splitter)
+		horizontal_splitter.addWidget(self.sec_sidebar)
 		horizontal_splitter.setStretchFactor(0, 0)
 		horizontal_splitter.setStretchFactor(1, 0)
 		horizontal_splitter.setStretchFactor(2, 1)
+		horizontal_splitter.setStretchFactor(3, 0)
 
 		self.main_layout.addWidget(horizontal_splitter)
 		

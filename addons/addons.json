@@ -2,5 +2,6 @@
 	"ToDoBtn": "addons.ToDo.Button",
 	"ToDo": "addons.ToDo.ToDo",
 	"GitBtn": "addons.Git.Button",
-	"Git": "addons.Git.Main"
+	"Git": "addons.Git.Main",
+	"md": "addons.mdPreview.Main"
 }
