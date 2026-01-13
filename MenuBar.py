@@ -32,6 +32,10 @@ class MenuBar:
 		open_folder_action.setShortcut("Ctrl+K Ctrl+O")
 		open_folder_action.triggered.connect(self.window.open_folder)
 
+		diff_action = QAction("ファイルの差分を比較...", self.window)
+		diff_action.setShortcut("Ctrl+D")
+		diff_action.triggered.connect(self.window.open_diff_viewer)
+
 		save_action = QAction("保存", self.window)
 		save_action.setShortcut("Ctrl+S")
 		save_action.triggered.connect(self.window.save_file)
@@ -54,6 +58,7 @@ class MenuBar:
 		self.file_menu.addSeparator()
 		self.file_menu.addAction(open_action)
 		self.file_menu.addAction(open_folder_action)
+		self.file_menu.addAction(diff_action)
 		self.file_menu.addSeparator()
 		self.file_menu.addAction(save_action)
 		self.file_menu.addAction(save_as_action)

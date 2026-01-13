@@ -5,6 +5,7 @@ from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from Highlight import Highlighter
 from Editor import Editor
+from DiffViewer import DiffViewer
 from ActivityBar import ActivityBar
 from SideBar import SideBar
 from MenuBar import MenuBar
@@ -13,6 +14,7 @@ from SecondarySideBar import SecondarySideBar
 import platform
 from AddonManager import AddonManager
 from Color import css_color, icon_color
+from pygments.lexers import guess_lexer
 
 OS = platform.system()
 DIR = os.getcwd()
@@ -152,7 +154,8 @@ class Window(QMainWindow):
 			try:
 				disp_text = ""
 				current_tab = self.tablist[self.tabs.currentIndex()]
-
+				if not hasattr(current_tab, 'textCursor'):
+					continue
 				cursor = current_tab.textCursor()
 				line = cursor.blockNumber() + 1
 				column = cursor.columnNumber() + 1
@@ -215,6 +218,24 @@ class Window(QMainWindow):
 		self.tabs.addTab(self.tablist[-1], name)
 		self.tabs.setCurrentIndex(len(self.tablist) - 1)
 
+	def newdiffviewer(self, text1: str, text2: str, title="Diff Viewer"):
+		self.tabfilelist.append(None)
+		self.tablist.append(DiffViewer(self))
+		self.tablist[-1].setFont(self.FONT)
+		options = QTextOption()
+		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
+		options.setWrapMode(QTextOption.WrapMode.NoWrap)
+		self.tablist[-1].difftxt1.document().setDefaultTextOption(options)
+		self.tablist[-1].difftxt2.document().setDefaultTextOption(options)
+		lexer = guess_lexer(text1)
+		self.tablist[-1].difftxt1.highlighter = Highlighter(window=self,parent=self.tablist[-1].difftxt1.document(), style=STYLE["highlight"], lexer=lexer)
+		self.tablist[-1].difftxt2.highlighter = Highlighter(window=self,parent=self.tablist[-1].difftxt2.document(), style=STYLE["highlight"], lexer=lexer)
+		self.tablist[-1].diff_texts(text1, text2)
+		self.tablist[-1].difftxt1.highlighter.tokenize()
+		self.tablist[-1].difftxt2.highlighter.tokenize()
+		self.tabs.addTab(self.tablist[-1], title)
+		self.tabs.setCurrentIndex(len(self.tablist) - 1)
+
 	def open_(self, file_path):
 		try:
 			with open(file_path, 'r', encoding='utf-8') as file:
@@ -248,6 +269,8 @@ class Window(QMainWindow):
 
 	def save_file(self):#保存
 		current_tab = self.tablist[self.tabs.currentIndex()]
+		if not hasattr(current_tab, 'textCursor'):
+			return
 		if not hasattr(current_tab, 'file_path'):
 			self.save_file_as()
 		else:
@@ -259,6 +282,8 @@ class Window(QMainWindow):
 
 	def save_file_as(self):#名前を付けて保存
 		current_tab = self.tablist[self.tabs.currentIndex()]
+		if not hasattr(current_tab, 'textCursor'):
+			return
 		file_path, _ = QFileDialog.getSaveFileName(self, "名前を付けて保存", "", "All Files (*.*)")
 		if file_path:
 			try:
@@ -278,6 +303,8 @@ class Window(QMainWindow):
 
 	def maybe_save(self, index):#変更の保存確認
 		current_tab = self.tablist[index]
+		if not hasattr(current_tab, 'textCursor'):
+			return True
 		if hasattr(current_tab, 'file_path'):
 			with open(current_tab.file_path, 'r', encoding='utf-8') as file:
 				content = file.read()
@@ -305,6 +332,8 @@ class Window(QMainWindow):
 		if self.running:
 			return
 		current_tab = self.tablist[self.tabs.currentIndex()]
+		if not hasattr(current_tab, 'textCursor'):
+			return
 		if not hasattr(current_tab, 'file_path'):
 			return
 		if os.path.splitext(current_tab.file_path)[-1] == ".py":
@@ -325,6 +354,8 @@ class Window(QMainWindow):
 
 	def toggle_wrap(self, checked):#折り返し切替
 		for tab in self.tablist:
+			if hasattr(tab, 'textCursor'):
+				continue
 			options = QTextOption()
 			options.setTabStopDistance(QFontMetrics(tab.font()).horizontalAdvance(' ') * 4)
 			if checked:
@@ -340,6 +371,20 @@ class Window(QMainWindow):
 			self.sidebar.show()
 		self.sidebar.setCurrentIndex(1)
 
+	def open_diff_viewer(self):
+		file_paths, _ = QFileDialog.getOpenFileNames(self, "ファイルを開く", "", "All Files (*.*)")
+		if len(file_paths) != 2:
+			QMessageBox.warning(self, "警告", "2つのファイルを選択してください。")
+			return
+		try:
+			with open(file_paths[0], 'r', encoding='utf-8') as file1, open(file_paths[1], 'r', encoding='utf-8') as file2:
+				content1 = file1.read()
+				content2 = file2.read()
+			self.newdiffviewer(content1, content2, title=f"title")
+		except:
+			QMessageBox.warning(self, "警告", "ファイルの読み込みに失敗しました。")
+			return
+
 	def toggle_fullscreen(self, checked):#全画面表示切替
 		if checked:
 			self.showFullScreen()
@@ -353,11 +398,23 @@ class Window(QMainWindow):
 		self.setStyleSheet(open(STYLE["style"], "r", encoding="utf-8").read())
 
 		for tab in self.tablist:
-			tab.highlighter.formats.clear()
-			tab.highlighter.replace.clear()
-			tab.highlighter.style = STYLE["highlight"]
-			tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
-			tab.highlighter.rehighlight()
+			if isinstance(tab, DiffViewer):
+				# DiffViewerの場合は両方のエディタを更新
+				for editor in [tab.difftxt1, tab.difftxt2]:
+					editor.setFont(self.FONT)
+					editor.highlighter.formats.clear()
+					editor.highlighter.replace.clear()
+					editor.highlighter.style = STYLE["highlight"]
+					editor.highlighter.set_filetype(None)
+					editor.highlighter.rehighlight()
+				# 差分ハイライトも再適用
+				tab.reapply_theme()
+			elif hasattr(tab, 'highlighter'):
+				tab.highlighter.formats.clear()
+				tab.highlighter.replace.clear()
+				tab.highlighter.style = STYLE["highlight"]
+				tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
+				tab.highlighter.rehighlight()
 		for btn in self.ConsoleGroup.btn_group.buttons():
 			btn.setIcon(QIcon(f"{self.DIR}/assets/terminal.svg"))
 		self.ConsoleGroup.btn_group.button(self.ConsoleGroup.terminalstack.currentIndex()).setIcon(QIcon(f"{self.DIR}/assets/terminal-fill.svg"))
@@ -397,6 +454,8 @@ class Window(QMainWindow):
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
 		for i in range(len(self.tablist)):
+			if not hasattr(i, "textCursor"):
+				continue
 			if not self.maybe_save(i):
 				can_close = False
 				break
