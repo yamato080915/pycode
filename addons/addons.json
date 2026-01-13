@@ -1,7 +1,8 @@
 {
-	"ToDoBtn": "addons.ToDo.Button",
-	"ToDo": "addons.ToDo.ToDo",
 	"GitBtn": "addons.Git.Button",
 	"Git": "addons.Git.Main",
+	"GitGraphSecondary": "addons.GitGraph.Main",
+	"ToDoBtn": "addons.ToDo.Button",
+	"ToDo": "addons.ToDo.ToDo",
 	"md": "addons.mdPreview.Main"
 }

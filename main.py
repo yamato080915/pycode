@@ -454,7 +454,7 @@ class Window(QMainWindow):
 	def closeEvent(self, event):#終了前処理など
 		can_close = True
 		for i in range(len(self.tablist)):
-			if not hasattr(i, "textCursor"):
+			if not hasattr(self.tablist[i], "textCursor"):
 				continue
 			if not self.maybe_save(i):
 				can_close = False
@@ -474,6 +474,7 @@ class Window(QMainWindow):
 			)
 		else:
 			subprocess.Popen([sys.executable, os.path.abspath(__file__)])
+
 if __name__ == "__main__":
 	app = QApplication(sys.argv)
 	window = Window()
