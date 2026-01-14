@@ -51,7 +51,11 @@ class AddonManager:
 			self.load_addon(addon)
 
 	def load_addon(self, addon):
-		a = getattr(importlib.import_module(".".join(addon.split(".")[:-1])), addon.split(".")[-1])
+		try:
+			a = getattr(importlib.import_module(".".join(addon.split(".")[:-1])), addon.split(".")[-1])
+		except (ModuleNotFoundError, AttributeError) as e:
+			print(f"Failed to load addon {addon}: {e}")
+			return
 		if issubclass(a, ActivityBar):
 			self.addons["ActivityBar"].append(a)
 		elif issubclass(a, SideBar):

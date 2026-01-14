@@ -2,5 +2,6 @@
 	"Git": ["addons.Git.Button", "addons.Git.Main"],
 	"GitGraph": "addons.GitGraph.Main",
 	"ToDo": ["addons.ToDo.Button", "addons.ToDo.ToDo"],
-	"md": "addons.mdPreview.Main"
+	"md": "addons.mdPreview.Main",
+	"html": "addons.htmlPreview.Main"
 }
