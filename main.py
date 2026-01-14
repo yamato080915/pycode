@@ -466,6 +466,11 @@ class Window(QMainWindow):
 		else:
 			event.ignore()
 	
+	def restart_application(self):
+		self.close()
+		time.sleep(0.5)
+		self.new_window()
+
 	def new_window(self):
 		if OS == "Windows":
 			subprocess.Popen(
