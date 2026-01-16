@@ -2,6 +2,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
 from Explorer import Explorer
 from Search import Search
+from Git import Main
 #from main import window as win
 
 class SideBar(QStackedWidget):
@@ -13,19 +14,23 @@ class SideBar(QStackedWidget):
 		self.addWidget(self.explorer)
 		self.search = Search(window)
 		self.addWidget(self.search)
+		self.git = Main(window)
+		self.addWidget(self.git)
 
 		self.setCurrentIndex(0)
 
 		window.activity_bar.explorer_btn.clicked.connect(lambda: self.switch_tab(0))
 		window.activity_bar.search_btn.clicked.connect(lambda: self.switch_tab(1))
+		window.activity_bar.git_btn.clicked.connect(lambda: self.switch_tab(2))
 
 		self.activity_btn_group = QButtonGroup()
 		self.activity_btn_group.addButton(window.activity_bar.explorer_btn, 0)
 		self.activity_btn_group.addButton(window.activity_bar.search_btn, 1)
+		self.activity_btn_group.addButton(window.activity_bar.git_btn, 2)
 		for i, btn in enumerate(window.activity_bar.addonbtn):
-			btn.clicked.connect(lambda checked, index=i + 2: self.switch_tab(index))
-			self.activity_btn_group.addButton(btn, i + 2)
-			self.addWidget(addons[i](window, index=i + 2))
+			btn.clicked.connect(lambda checked, index=i + 3: self.switch_tab(index))
+			self.activity_btn_group.addButton(btn, i + 3)
+			self.addWidget(addons[i](window, index=i + 3))
 		
 		self.activity_btn_group.setExclusive(True)
 	

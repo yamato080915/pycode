@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
+from Git import Button
 
 class ActivityBar(QWidget):
 	def __init__(self, window=None, addons=[]):
@@ -13,13 +14,15 @@ class ActivityBar(QWidget):
 		self.bar_layout.setContentsMargins(0,0,0,0)
 		self.bar_layout.setSpacing(0)
 
-		self.icons = [("folder.svg", "folder-open.svg"), ("search.svg", "search.svg")]
+		self.icons = [("folder.svg", "folder-open.svg"), ("search.svg", "search.svg"), ("git.svg", "git.svg")]
 	
 		self.explorer()
 		self.search()
+		self.git_btn = Button(window).button()
 
 		self.bar_layout.addWidget(self.explorer_btn)
 		self.bar_layout.addWidget(self.search_btn)
+		self.bar_layout.addWidget(self.git_btn)
 		self.addonbtn = []
 		for i in addons:
 			addon = i(window)
