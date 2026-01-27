@@ -90,6 +90,9 @@ class CompactGraphWidget(QWidget):
 		self.branch_width = 20
 		self.node_size = 6
 		self.current_branch_head = None  # 現在のブランチのHEAD
+		self.detail_height = 0  # 詳細パネルの高さ
+		self.selected_index = -1  # 選択されたコミットのインデックス
+		self.selected_commit_files = []  # 選択されたコミットのファイル一覧
 		self.setMinimumHeight(50)
 		
 		# カラーパレット（パステル調）
@@ -114,8 +117,15 @@ class CompactGraphWidget(QWidget):
 		self.commits = commits
 		self.current_branch_head = current_head
 		self.calculateBranches()
-		self.setFixedHeight(len(commits) * self.row_height + 30)
+		self.updateHeight()
 		self.update()
+	
+	def updateHeight(self):
+		"""ウィジェットの高さを更新"""
+		total_height = len(self.commits) * self.row_height + 30
+		if self.selected_index >= 0:
+			total_height += self.detail_height
+		self.setFixedHeight(total_height)
 	
 	def calculateBranches(self):
 		"""ブランチレーンを計算（簡易版）"""
@@ -159,6 +169,27 @@ class CompactGraphWidget(QWidget):
 		# 背景
 		painter.fillRect(self.rect(), QColor("#252526"))
 		
+		# ホバー・選択中の行の背景を描画（接続線の前に）
+		for i, commit in enumerate(self.commits):
+			y = self.getCommitY(i)
+			
+			if commit == self.selected:
+				# 選択中の行
+				painter.fillRect(0, y, self.width(), self.row_height, QColor("#094771"))
+			elif commit == self.hover_commit:
+				# ホバー中の行
+				painter.fillRect(0, y, self.width(), self.row_height, QColor("#2A2D2E"))
+		
+		# 詳細パネルの背景
+		if self.selected_index >= 0 and self.detail_height > 0:
+			detail_y = self.getCommitY(self.selected_index) + self.row_height
+			painter.fillRect(0, detail_y, self.width(), self.detail_height, QColor("#1E1E1E"))
+			painter.setPen(QColor("#3E3E42"))
+			painter.drawRect(0, detail_y, self.width() - 1, self.detail_height - 1)
+			
+			# 詳細情報を描画
+			self.drawDetail(painter, self.selected, detail_y)
+		
 		# 接続線を描画
 		for i, commit in enumerate(self.commits):
 			for parent_hash in commit.parents:
@@ -170,15 +201,22 @@ class CompactGraphWidget(QWidget):
 		for i, commit in enumerate(self.commits):
 			self.drawCommit(painter, commit, i)
 	
+	def getCommitY(self, index):
+		"""コミットのY座標を取得（詳細パネルを考慮）"""
+		if index <= self.selected_index or self.selected_index < 0:
+			return index * self.row_height
+		else:
+			return index * self.row_height + self.detail_height
+	
 	def drawLine(self, painter, commit, parent, index):
 		"""接続線を描画"""
 		start_x = commit.branch * self.branch_width + 20
-		start_y = index * self.row_height + 15
+		start_y = self.getCommitY(index) + 15
 		
 		parent_idx = self.commits.index(parent) if parent in self.commits else -1
 		if parent_idx >= 0:
 			end_x = parent.branch * self.branch_width + 20
-			end_y = parent_idx * self.row_height + 15
+			end_y = self.getCommitY(parent_idx) + 15
 			
 			color = self.colors[commit.color_index]
 			pen = QPen(color.darker(130), 1.5)
@@ -200,7 +238,7 @@ class CompactGraphWidget(QWidget):
 	def drawCommit(self, painter, commit, index):
 		"""コミットノードとテキストを描画"""
 		x = commit.branch * self.branch_width + 20
-		y = index * self.row_height + 15
+		y = self.getCommitY(index) + 15
 		
 		# ノード
 		color = self.colors[commit.color_index]
@@ -250,6 +288,69 @@ class CompactGraphWidget(QWidget):
 			painter.drawText(text_x + 280, y + 4, ref_text)
 			font.setBold(False)
 	
+	def drawDetail(self, painter, commit, y):
+		"""詳細情報を描画"""
+		if not commit:
+			return
+		
+		painter.setPen(QColor("#CCCCCC"))
+		font = QFont("Consolas", 8)
+		painter.setFont(font)
+		
+		# コミット情報
+		info_y = y + 15
+		painter.drawText(20, info_y, f"COMMIT: {commit.hash}")
+		info_y += 15
+		painter.drawText(20, info_y, f"AUTHOR: {commit.author}")
+		info_y += 15
+		painter.drawText(20, info_y, f"DATE: {commit.date}")
+		info_y += 15
+		
+		painter.setPen(QColor("#569CD6"))
+		painter.drawText(20, info_y, "MESSAGE:")
+		info_y += 15
+		painter.setPen(QColor("#D4D4D4"))
+		
+		# メッセージを複数行に分割
+		message_lines = [commit.message[i:i+80] for i in range(0, len(commit.message), 80)]
+		for line in message_lines[:3]:  # 最大3行
+			painter.drawText(40, info_y, line)
+			info_y += 15
+		
+		# ファイルリスト
+		if self.selected_commit_files:
+			info_y += 10
+			painter.setPen(QColor("#4EC9B0"))
+			painter.drawText(20, info_y, f"📄 変更されたファイル ({len(self.selected_commit_files)}):")
+			info_y += 15
+			
+			# ファイル一覧（最大10個まで表示）
+			for file_path, status in self.selected_commit_files[:10]:
+				color = self.getFileStatusColor(status)
+				painter.setPen(QColor(color))
+				icon = self.getFileStatusIcon(status)
+				painter.drawText(40, info_y, f"{icon} {file_path}")
+				info_y += 15
+			
+			if len(self.selected_commit_files) > 10:
+				painter.setPen(QColor("#858585"))
+				painter.drawText(40, info_y, f"... and {len(self.selected_commit_files) - 10} more")
+	
+	def getFileStatusColor(self, status):
+		"""ファイルステータスの色"""
+		colors = {
+			'M': '#E5C07B', 'A': '#98C379', 'D': '#E06C75',
+			'R': '#61AFEF', 'U': '#4EC9B0', 'C': '#C678DD', 'T': '#56B6C2'
+		}
+		return colors.get(status[0] if status else 'M', '#ABB2BF')
+	
+	def getFileStatusIcon(self, status):
+		"""ファイルステータスのアイコン"""
+		icons = {
+			'M': '◆', 'A': '+', 'D': '−', 'R': '→', 'U': '?', 'C': '©', 'T': '≠'
+		}
+		return icons.get(status[0] if status else 'M', '•')
+	
 	def findCommit(self, hash):
 		"""ハッシュでコミット検索"""
 		for c in self.commits:
@@ -260,13 +361,24 @@ class CompactGraphWidget(QWidget):
 	def mousePressEvent(self, event):
 		"""クリック処理"""
 		for i, commit in enumerate(self.commits):
-			x = commit.branch * self.branch_width + 20
-			y = i * self.row_height + 15
+			y_start = self.getCommitY(i)
+			y_end = y_start + self.row_height
 			
-			dist = ((event.pos().x() - x) ** 2 + (event.pos().y() - y) ** 2) ** 0.5
-			if dist <= self.node_size + 8:
-				self.selected = commit
-				self.commitSelected.emit(commit)
+			# 行全体でクリック可能
+			if y_start <= event.pos().y() < y_end:
+				# 同じコミットをクリックした場合は折りたたみ
+				if self.selected == commit and self.detail_height > 0:
+					self.selected = None
+					self.selected_index = -1
+					self.detail_height = 0
+					self.selected_commit_files = []
+				else:
+					self.selected = commit
+					self.selected_index = i
+					self.detail_height = 90  # 詳細パネルの初期高さ（ファイル読み込み前）
+					self.commitSelected.emit(commit)
+				
+				self.updateHeight()
 				self.update()
 				break
 	
@@ -276,16 +388,31 @@ class CompactGraphWidget(QWidget):
 		self.hover_commit = None
 		
 		for i, commit in enumerate(self.commits):
-			x = commit.branch * self.branch_width + 20
-			y = i * self.row_height + 15
+			y_start = self.getCommitY(i)
+			y_end = y_start + self.row_height
 			
-			dist = ((event.pos().x() - x) ** 2 + (event.pos().y() - y) ** 2) ** 0.5
-			if dist <= self.node_size + 8:
+			# 行全体でホバー可能
+			if y_start <= event.pos().y() < y_end:
 				self.hover_commit = commit
 				break
 		
 		if old_hover != self.hover_commit:
 			self.update()
+	
+	def setCommitFiles(self, files):
+		"""選択されたコミットのファイル一覧を設定"""
+		self.selected_commit_files = files
+		
+		# ファイル数に応じて詳細パネルの高さを調整
+		if self.selected_index >= 0:
+			# 基本情報 + メッセージ + ファイルリストヘッダー = 約90px
+			base_height = 90
+			# ファイル1つにつき約15px
+			file_height = min(len(files), 15) * 15  # 最大15ファイルまで表示
+			self.detail_height = base_height + file_height + (20 if len(files) > 15 else 0)  # "... and more" 用
+			self.updateHeight()
+		
+		self.update()
 
 class Main(SecondarySideBar):
 	"""SecondarySideBar用のGitGraphクラス"""
@@ -351,78 +478,7 @@ class Main(SecondarySideBar):
 		self.graph.commitSelected.connect(self.showDetails)
 		scroll.setWidget(self.graph)
 		
-		# スプリッター
-		splitter = QSplitter(Qt.Vertical)
-		splitter.addWidget(scroll)
-		
-		# 詳細パネル
-		detail_panel = QWidget()
-		detail_panel.setStyleSheet("background: #1E1E1E;")
-		detail_layout = QVBoxLayout()
-		detail_layout.setContentsMargins(10, 10, 10, 10)
-		
-		detail_title = QLabel("📝 コミット詳細")
-		detail_title.setStyleSheet("color: #CCCCCC; font-weight: bold; font-size: 10px;")
-		detail_layout.addWidget(detail_title)
-		
-		self.detail_text = QTextEdit()
-		self.detail_text.setReadOnly(True)
-		self.detail_text.setMaximumHeight(100)
-		self.detail_text.setStyleSheet("""
-			QTextEdit {
-				background: #252526;
-				color: #CCCCCC;
-				border: 1px solid #3E3E42;
-				border-radius: 4px;
-				padding: 8px;
-				font-family: Consolas;
-				font-size: 9px;
-			}
-		""")
-		self.detail_text.setPlaceholderText("コミットを選択...")
-		detail_layout.addWidget(self.detail_text)
-		
-		# 変更ファイルリスト
-		files_title = QLabel("📄 変更されたファイル")
-		files_title.setStyleSheet("color: #CCCCCC; font-weight: bold; font-size: 10px; margin-top: 8px;")
-		detail_layout.addWidget(files_title)
-		
-		# ファイルリストのスクロールエリア
-		files_scroll = QScrollArea()
-		files_scroll.setWidgetResizable(True)
-		files_scroll.setStyleSheet("""
-			QScrollArea {
-				border: 1px solid #3E3E42;
-				border-radius: 4px;
-				background: #252526;
-			}
-			QScrollBar:vertical {
-				background: #252526;
-				width: 8px;
-			}
-			QScrollBar::handle:vertical {
-				background: #424242;
-				border-radius: 4px;
-			}
-		""")
-		
-		files_widget = QWidget()
-		self.files_layout = QVBoxLayout()
-		self.files_layout.setContentsMargins(0, 0, 0, 0)
-		self.files_layout.setSpacing(0)
-		self.files_layout.addStretch()
-		files_widget.setLayout(self.files_layout)
-		files_scroll.setWidget(files_widget)
-		
-		detail_layout.addWidget(files_scroll, 1)
-		
-		detail_panel.setLayout(detail_layout)
-		splitter.addWidget(detail_panel)
-		
-		splitter.setStretchFactor(0, 8)
-		splitter.setStretchFactor(1, 2)
-		
-		layout.addWidget(splitter, 1)
+		layout.addWidget(scroll, 1)
 		
 		# ステータスバー
 		self.status = QLabel("準備完了")
@@ -595,16 +651,6 @@ class Main(SecondarySideBar):
 	
 	def showDetails(self, commit):
 		"""詳細表示"""
-		html = f"""<b style='color:#4EC9B0;'>COMMIT:</b> <span style='color:#DCDCAA;'>{commit.hash}</span><br>
-<b style='color:#4EC9B0;'>AUTHOR:</b> {commit.author}<br>
-<b style='color:#4EC9B0;'>DATE:</b> {commit.date}<br>
-<b style='color:#4EC9B0;'>REFS:</b> {', '.join(commit.refs) if commit.refs else 'none'}<br>
-<b style='color:#4EC9B0;'>PARENTS:</b> {', '.join([p[:7] for p in commit.parents]) if commit.parents else 'initial'}<br>
-<br>
-<b style='color:#569CD6;'>MESSAGE:</b><br>
-<div style='color:#D4D4D4; margin-left:10px;'>{commit.message}</div>
-"""
-		self.detail_text.setHtml(html)
 		self.status.setText(f"✓ {commit.hash[:7]} selected")
 		
 		# 変更ファイルを取得して表示
@@ -612,12 +658,6 @@ class Main(SecondarySideBar):
 	
 	def loadCommitFiles(self, commit):
 		"""コミットの変更ファイルを取得して表示"""
-		# 既存のアイテムをクリア
-		while self.files_layout.count() > 1:  # ストレッチを残す
-			item = self.files_layout.takeAt(0)
-			if item.widget():
-				item.widget().deleteLater()
-		
 		# 変更ファイルを取得
 		if commit.parents:
 			# 通常のコミット: 親との差分
@@ -627,13 +667,10 @@ class Main(SecondarySideBar):
 			output = self.runGit(['diff-tree', '--no-commit-id', '--name-status', '-r', commit.hash])
 		
 		if not output:
-			no_files = QLabel("変更なし")
-			no_files.setStyleSheet("color: #858585; padding: 8px;")
-			no_files.setFont(QFont("Segoe UI", 9))
-			self.files_layout.insertWidget(0, no_files)
+			self.graph.setCommitFiles([])
 			return
 		
-		# ファイルをパースして表示
+		# ファイルをパース
 		files = []
 		for line in output.split('\n'):
 			if line.strip():
@@ -643,31 +680,8 @@ class Main(SecondarySideBar):
 					file_path = parts[1].strip()
 					files.append((file_path, status))
 		
-		# カウント表示用のヘッダー
-		if files:
-			stats = {}
-			for _, status in files:
-				stats[status] = stats.get(status, 0) + 1
-			
-			stats_text = ", ".join([f"{self.get_status_name(s)}: {c}" for s, c in stats.items()])
-			header = QLabel(f"{len(files)} ファイル ({stats_text})")
-			header.setStyleSheet("color: #CCCCCC; padding: 4px 8px; font-size: 8px; background: #1E1E1E;")
-			header.setFont(QFont("Segoe UI", 8))
-			self.files_layout.insertWidget(0, header)
-			
-			# ファイルアイテムを追加
-			for file_path, status in files:
-				item = CommitFileItem(file_path, status[0] if status else 'M')
-				item.clicked.connect(lambda fp=file_path, s=status, c=commit: self.onCommitFileClicked(fp, s, c))
-				self.files_layout.insertWidget(self.files_layout.count() - 1, item)
-	
-	def get_status_name(self, status):
-		"""ステータス名"""
-		names = {
-			'M': '変更', 'A': '追加', 'D': '削除',
-			'R': '名前変更', 'C': 'コピー', 'T': 'タイプ変更'
-		}
-		return names.get(status[0] if status else 'M', '不明')
+		# グラフウィジェットにファイル情報を渡す
+		self.graph.setCommitFiles(files)
 	
 	def onCommitFileClicked(self, file_path, status, commit):
 		"""コミットファイルがクリックされた時"""

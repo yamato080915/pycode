@@ -28,7 +28,6 @@ class TerminalGroup(QWidget):
 
 		self.mainlayout.addWidget(self.terminalstack)
 		self.mainlayout.addWidget(self.tab)
-		self.add_terminal("Runner")
 		self.add_terminal()
 	
 	def add_terminal(self, name="Terminal"):
