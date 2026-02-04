@@ -82,6 +82,7 @@ class CommitItem:
 class CompactGraphWidget(QWidget):
 	"""コンパクトなGitグラフを描画するウィジェット"""
 	commitSelected = Signal(CommitItem)
+	fileClicked = Signal(str, str, CommitItem)  # file_path, status, commit
 	
 	def __init__(self, parent=None):
 		super().__init__(parent)
@@ -93,6 +94,7 @@ class CompactGraphWidget(QWidget):
 		self.detail_height = 0  # 詳細パネルの高さ
 		self.selected_index = -1  # 選択されたコミットのインデックス
 		self.selected_commit_files = []  # 選択されたコミットのファイル一覧
+		self.file_rects = []  # ファイルのクリック可能領域 [(rect, file_path, status), ...]
 		self.setMinimumHeight(50)
 		
 		# カラーパレット（パステル調）
@@ -293,6 +295,9 @@ class CompactGraphWidget(QWidget):
 		if not commit:
 			return
 		
+		# ファイルクリック領域をクリア
+		self.file_rects.clear()
+		
 		painter.setPen(QColor("#CCCCCC"))
 		font = QFont("Consolas", 8)
 		painter.setFont(font)
@@ -324,17 +329,24 @@ class CompactGraphWidget(QWidget):
 			painter.drawText(20, info_y, f"📄 変更されたファイル ({len(self.selected_commit_files)}):")
 			info_y += 15
 			
-			# ファイル一覧（最大10個まで表示）
-			for file_path, status in self.selected_commit_files[:10]:
+			# すべてのファイルを表示
+			for file_path, status in self.selected_commit_files:
+				file_y = info_y
+				
+				# ホバー背景
+				file_rect = QRect(30, file_y - 12, self.width() - 40, 15)
+				if file_rect.contains(self.mapFromGlobal(self.cursor().pos())):
+					painter.fillRect(file_rect, QColor("#2A2D2E"))
+				
+				# ファイル表示
 				color = self.getFileStatusColor(status)
 				painter.setPen(QColor(color))
 				icon = self.getFileStatusIcon(status)
 				painter.drawText(40, info_y, f"{icon} {file_path}")
+				
+				# クリック領域を記録
+				self.file_rects.append((file_rect, file_path, status))
 				info_y += 15
-			
-			if len(self.selected_commit_files) > 10:
-				painter.setPen(QColor("#858585"))
-				painter.drawText(40, info_y, f"... and {len(self.selected_commit_files) - 10} more")
 	
 	def getFileStatusColor(self, status):
 		"""ファイルステータスの色"""
@@ -360,6 +372,13 @@ class CompactGraphWidget(QWidget):
 	
 	def mousePressEvent(self, event):
 		"""クリック処理"""
+		# ファイルクリックをチェック
+		for rect, file_path, status in self.file_rects:
+			if rect.contains(event.pos()):
+				self.fileClicked.emit(file_path, status, self.selected)
+				return
+		
+		# コミット行クリック
 		for i, commit in enumerate(self.commits):
 			y_start = self.getCommitY(i)
 			y_end = y_start + self.row_height
@@ -387,6 +406,19 @@ class CompactGraphWidget(QWidget):
 		old_hover = self.hover_commit
 		self.hover_commit = None
 		
+		# ファイル領域のホバーチェック
+		is_over_file = False
+		for rect, file_path, status in self.file_rects:
+			if rect.contains(event.pos()):
+				is_over_file = True
+				break
+		
+		# カーソルを変更
+		if is_over_file:
+			self.setCursor(Qt.PointingHandCursor)
+		else:
+			self.setCursor(Qt.ArrowCursor)
+		
 		for i, commit in enumerate(self.commits):
 			y_start = self.getCommitY(i)
 			y_end = y_start + self.row_height
@@ -405,11 +437,14 @@ class CompactGraphWidget(QWidget):
 		
 		# ファイル数に応じて詳細パネルの高さを調整
 		if self.selected_index >= 0:
-			# 基本情報 + メッセージ + ファイルリストヘッダー = 約90px
-			base_height = 90
-			# ファイル1つにつき約15px
-			file_height = min(len(files), 15) * 15  # 最大15ファイルまで表示
-			self.detail_height = base_height + file_height + (20 if len(files) > 15 else 0)  # "... and more" 用
+			# 基本情報（COMMIT, AUTHOR, DATE）: 15px × 3 = 45px
+			# MESSAGE ヘッダー + メッセージ（最大3行）: 15px + 15px × 3 = 60px
+			# ファイルリストヘッダー: 10px（余白） + 15px = 25px
+			# 下部余白: 15px
+			base_height = 145
+			# ファイル1つにつき15px
+			file_height = len(files) * 15
+			self.detail_height = base_height + file_height
 			self.updateHeight()
 		
 		self.update()
@@ -476,6 +511,7 @@ class Main(SecondarySideBar):
 		
 		self.graph = CompactGraphWidget()
 		self.graph.commitSelected.connect(self.showDetails)
+		self.graph.fileClicked.connect(self.onCommitFileClicked)
 		scroll.setWidget(self.graph)
 		
 		layout.addWidget(scroll, 1)
@@ -685,6 +721,10 @@ class Main(SecondarySideBar):
 	
 	def onCommitFileClicked(self, file_path, status, commit):
 		"""コミットファイルがクリックされた時"""
+		# commitがNoneの場合は何もしない
+		if not commit:
+			return
+		
 		# 差分を表示
 		if status.startswith('D'):
 			# 削除されたファイル: 親コミットのファイル内容のみ
