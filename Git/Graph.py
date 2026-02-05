@@ -142,7 +142,12 @@ class CompactGraphWidget(QWidget):
 			else:
 				# 空いているブランチを探す
 				if used_branches:
-					branch = min([b for b in used_branches if b not in [self.branch_map.get(c.hash, -1) for c in self.commits[i:]]])
+					available_branches = [b for b in used_branches if b not in [self.branch_map.get(c.hash, -1) for c in self.commits[i:]]]
+					if available_branches:
+						branch = min(available_branches)
+					else:
+						branch = next_branch
+						next_branch += 1
 				else:
 					branch = next_branch
 					next_branch += 1

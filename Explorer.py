@@ -3,10 +3,10 @@ from PySide6.QtCore import QDir, QFileInfo
 from PySide6.QtGui import QIcon
 
 class CustomIconProvider(QFileIconProvider):
-	def __init__(self):
+	def __init__(self, dir):
 		super().__init__()
 		# カスタムアイコンの辞書（拡張子: アイコンパス）
-		icon_base = 'assets/explorer_icons/'
+		icon_base = f'{dir}/assets/explorer_icons/'
 		self.custom_icons = {
 			# Python
 			'.py': icon_base + 'python.svg',
@@ -159,7 +159,7 @@ class Explorer(QTreeView):
 		self.file_model = QFileSystemModel()
 		
 		# カスタムアイコンプロバイダーを設定
-		icon_provider = CustomIconProvider()
+		icon_provider = CustomIconProvider(dir = window.DIR)
 		self.file_model.setIconProvider(icon_provider)
 		
 		self.file_model.setRootPath(QDir.currentPath())

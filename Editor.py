@@ -180,7 +180,7 @@ class Editor(QPlainTextEdit):
 		self._minimap_update_pending = False
 		
 		self.blockCountChanged.connect(self.update_line_number_area_width)
-		self.updateRequest.connect(self.update_line_number_area)
+		self.updateRequest.connect(lambda rect, dy: self.update_line_number_area(rect, dy))
 		self.cursorPositionChanged.connect(self.highlight_current_line)
 		
 		self.textChanged.connect(self.schedule_minimap_update)
