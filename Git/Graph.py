@@ -2,7 +2,7 @@ from addons.AddonBase import SecondarySideBar
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon, Qt, QColor, QFont, QPainter, QPen, QBrush
 from PySide6.QtCore import QTimer, QDir, QRect, QPoint, Signal, QFileSystemWatcher
-import subprocess
+from Git.common import get_status_icon, get_status_color, run_git
 import os
 import re
 from datetime import datetime
@@ -21,7 +21,7 @@ class CommitFileItem(QWidget):
 		layout.setSpacing(8)
 		
 		# ステータスアイコン
-		status_icon = QLabel(self.get_status_icon(status))
+		status_icon = QLabel(get_status_icon(status))
 		status_icon.setFont(QFont("Segoe UI", 10))
 		status_icon.setFixedWidth(20)
 		layout.addWidget(status_icon)
@@ -29,7 +29,7 @@ class CommitFileItem(QWidget):
 		# ファイル名
 		file_name = QLabel(os.path.basename(file_path))
 		file_name.setFont(QFont("Segoe UI", 9))
-		file_name.setStyleSheet(f"color: {self.get_status_color(status)};")
+		file_name.setStyleSheet(f"color: {get_status_color(status)};")
 		layout.addWidget(file_name, 1)
 		
 		# パス表示
@@ -344,29 +344,14 @@ class CompactGraphWidget(QWidget):
 					painter.fillRect(file_rect, QColor("#2A2D2E"))
 				
 				# ファイル表示
-				color = self.getFileStatusColor(status)
+				color = get_status_color(status)
 				painter.setPen(QColor(color))
-				icon = self.getFileStatusIcon(status)
+				icon = get_status_icon(status)
 				painter.drawText(40, info_y, f"{icon} {file_path}")
 				
 				# クリック領域を記録
 				self.file_rects.append((file_rect, file_path, status))
 				info_y += 15
-	
-	def getFileStatusColor(self, status):
-		"""ファイルステータスの色"""
-		colors = {
-			'M': '#E5C07B', 'A': '#98C379', 'D': '#E06C75',
-			'R': '#61AFEF', 'U': '#4EC9B0', 'C': '#C678DD', 'T': '#56B6C2'
-		}
-		return colors.get(status[0] if status else 'M', '#ABB2BF')
-	
-	def getFileStatusIcon(self, status):
-		"""ファイルステータスのアイコン"""
-		icons = {
-			'M': '◆', 'A': '+', 'D': '−', 'R': '→', 'U': '?', 'C': '©', 'T': '≠'
-		}
-		return icons.get(status[0] if status else 'M', '•')
 	
 	def findCommit(self, hash):
 		"""ハッシュでコミット検索"""
@@ -578,35 +563,7 @@ class Main(SecondarySideBar):
 	
 	def runGit(self, args):
 		"""Gitコマンド実行"""
-		try:
-			cwd = QDir.currentPath()
-			if os.name == 'nt':
-				si = subprocess.STARTUPINFO()
-				si.dwFlags = subprocess.STARTF_USESHOWWINDOW
-				result = subprocess.run(
-					['git'] + args,
-					capture_output=True,
-					text=True,
-					encoding='utf-8',
-					errors='replace',
-					cwd=cwd,
-					startupinfo=si
-				)
-			else:
-				result = subprocess.run(
-					['git'] + args,
-					capture_output=True,
-					text=True,
-					encoding='utf-8',
-					errors='replace',
-					cwd=cwd
-				)
-			
-			if result.returncode == 0:
-				return result.stdout.strip()
-			return None
-		except:
-			return None
+		return run_git(args)
 	
 	def loadGraph(self):
 		"""グラフを読み込み"""

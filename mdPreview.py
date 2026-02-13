@@ -1,55 +1,29 @@
-from addons.AddonBase import SecondarySideBar
+from PreviewBase import PreviewBase
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon, QFont
 from PySide6.QtCore import Qt, QTimer
+from Color import get_css_property
 import markdown
 from markdown.extensions.codehilite import CodeHiliteExtension
 from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.tables import TableExtension
 from markdown.extensions.toc import TocExtension
-import cssutils
-import logging
 
-cssutils.log.setLevel(logging.CRITICAL)
-
-class Main(SecondarySideBar):
+class Main(PreviewBase):
 	def __init__(self, window=None):
-		super().__init__()
-		self.win = window
+		super().__init__(window)
 		self.icon_color(f"{self.win.DIR}/assets/markdown.svg")
 		self.name = "md Preview"
 		self.icon = QIcon(f"{self.win.DIR}/assets/markdown.svg")
 		self.description = "Markdown Preview"
 		self.version = "1.0.0"
 
-		self._connected = False
-		self.update_timer = QTimer()
-		self.update_timer.timeout.connect(self.update_preview)
-		self.update_timer.setSingleShot(True)
-
 		main_layout = QVBoxLayout()
 		main_layout.setContentsMargins(0, 0, 0, 0)
 		main_layout.setSpacing(0)
 		
-		# ツールバー
-		toolbar = QWidget()
-		toolbar.setObjectName("mdpreview_toolbar")
-		toolbar_layout = QHBoxLayout(toolbar)
-		toolbar_layout.setContentsMargins(5, 5, 5, 5)
-		
-		self.filename_label = QLabel("プレビュー")
-		self.filename_label.setFont(QFont("Consolas", 10))
-		toolbar_layout.addWidget(self.filename_label)
-		
-		toolbar_layout.addStretch()
-		
-		# 更新ボタン
-		refresh_btn = QPushButton("🔄")
-		refresh_btn.setFixedSize(30, 30)
-		refresh_btn.setToolTip("更新")
-		refresh_btn.clicked.connect(self.force_update)
-		toolbar_layout.addWidget(refresh_btn)
-		
+		# ツールバー（共通基底クラスから作成）
+		toolbar = self.create_toolbar("プレビュー", object_name="mdpreview_toolbar")
 		main_layout.addWidget(toolbar)
 		
 		# プレビュー表示エリア
@@ -60,7 +34,6 @@ class Main(SecondarySideBar):
 		main_layout.addWidget(self.preview_area)
 		
 		self.setLayout(main_layout)
-		self.current_tab = None
 
 		# Markdown設定
 		self.md = markdown.Markdown(
@@ -78,55 +51,22 @@ class Main(SecondarySideBar):
 			]
 		)
 	
-	def showEvent(self, event):
-		if not self._connected:
-			self.win.tabs.currentChanged.connect(self.on_tab_changed)
-			self._connected = True
-		self.on_tab_changed(self.win.tabs.currentIndex())
-		return super().showEvent(event)
-	
-	def hideEvent(self, event):
-		if self.current_tab:
-			try:
-				if hasattr(self.current_tab, 'textChanged'):
-					self.current_tab.textChanged.disconnect(self.schedule_update)
-			except:
-				pass
-		return super().hideEvent(event)
-	
 	def on_tab_changed(self, index):
-		# 既存のタブの接続を解除
-		if self.current_tab:
-			try:
-				if hasattr(self.current_tab, 'textChanged'):
-					self.current_tab.textChanged.disconnect(self.schedule_update)
-			except:
-				pass
+		self._disconnect_current_tab()
 		
-		# 新しいタブに接続
 		if index >= 0 and index < len(self.win.tablist):
-			self.current_tab = self.win.tablist[index]
-			# textChangedシグナルを持つタブのみ接続
-			if hasattr(self.current_tab, 'textChanged'):
-				self.current_tab.textChanged.connect(self.schedule_update)
+			tab = self.win.tablist[index]
+			if hasattr(tab, 'textChanged'):
+				self._connect_tab(tab)
 				self.update_preview()
 			else:
+				self.current_tab = None
 				self.preview_area.setHtml("<p>このタイプのファイルはプレビューできません</p>")
 				self.filename_label.setText("プレビュー")
 		else:
 			self.current_tab = None
 			self.preview_area.setHtml("<p>ファイルが開かれていません</p>")
 			self.filename_label.setText("プレビュー")
-	
-	def schedule_update(self):
-		"""テキスト変更時に更新をスケジュール（500ms後）"""
-		self.update_timer.stop()
-		self.update_timer.start(500)
-	
-	def force_update(self):
-		"""即座に更新"""
-		self.update_timer.stop()
-		self.update_preview()
 	
 	def update_preview(self):
 		"""プレビューを更新"""
@@ -156,28 +96,14 @@ class Main(SecondarySideBar):
 		# プレビューを更新
 		self.preview_area.setHtml(styled_html)
 	
-	def get_color_from_css(self, selector, property_name, default):
-		"""CSSファイルから色を取得"""
-		try:
-			parser = cssutils.CSSParser(validate=False)
-			for rule in parser.parseFile(self.win.STYLE["style"]):
-				if rule.type == rule.STYLE_RULE:
-					if rule.selectorText == selector:
-						value = rule.style.getPropertyValue(property_name)
-						if value:
-							return value
-		except:
-			pass
-		return default
-	
 	def create_styled_html(self, content):
 		"""スタイル付きHTMLを作成"""
 		# CSSファイルから色を取得
-		bg_color = self.get_color_from_css("QPlainTextEdit", "background-color", "#282c34")
-		fg_color = self.get_color_from_css("QPlainTextEdit", "color", "#abb2bf")
+		bg_color = get_css_property(self.win.STYLE, "QPlainTextEdit", "background-color", "#282c34")
+		fg_color = get_css_property(self.win.STYLE, "QPlainTextEdit", "color", "#abb2bf")
 		link_color = "#61afef"  # リンク色（固定）
-		code_bg = self.get_color_from_css("#explorer QTreeView::item:hover", "background-color", "#2c313c")
-		border_color = self.get_color_from_css("QTabWidget::pane", "border-color", "#3e4451")
+		code_bg = get_css_property(self.win.STYLE, "#explorer QTreeView::item:hover", "background-color", "#2c313c")
+		border_color = get_css_property(self.win.STYLE, "QTabWidget::pane", "border-color", "#3e4451")
 		
 		html = f"""
 <!DOCTYPE html>

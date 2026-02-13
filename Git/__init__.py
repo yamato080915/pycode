@@ -2,7 +2,7 @@ from addons.AddonBase import ActivityBar, SideBar
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon, Qt, QColor, QFont, QPainter
 from PySide6.QtCore import QTimer, QDir, Signal, QSize
-import subprocess
+from Git.common import get_status_icon, get_status_color, run_git
 import os
 from datetime import datetime
 
@@ -22,7 +22,7 @@ class FileChangeItem(QWidget):
 		layout.setSpacing(8)
 		
 		# ステータスアイコン
-		status_icon = QLabel(self.get_status_icon(status))
+		status_icon = QLabel(get_status_icon(status))
 		status_icon.setFont(QFont("Segoe UI", 10))
 		status_icon.setFixedWidth(20)
 		layout.addWidget(status_icon)
@@ -30,7 +30,7 @@ class FileChangeItem(QWidget):
 		# ファイル名
 		file_name = QLabel(os.path.basename(file_path))
 		file_name.setFont(QFont("Segoe UI", 9))
-		file_name.setStyleSheet(f"color: {self.get_status_color(status)};")
+		file_name.setStyleSheet(f"color: {get_status_color(status)};")
 		layout.addWidget(file_name, 1)
 		
 		# ステージボタン
@@ -80,21 +80,6 @@ class FileChangeItem(QWidget):
 			}
 		""")
 	
-	def get_status_icon(self, status):
-		"""ステータスアイコン"""
-		icons = {
-			'M': '◆', 'A': '+', 'D': '−', 'R': '→', 'U': '?', 'C': '©'
-		}
-		return icons.get(status, '•')
-	
-	def get_status_color(self, status):
-		"""ステータスカラー"""
-		colors = {
-			'M': '#E5C07B', 'A': '#98C379', 'D': '#E06C75',
-			'R': '#61AFEF', 'U': '#4EC9B0', 'C': '#C678DD'
-		}
-		return colors.get(status, '#ABB2BF')
-	
 	def mousePressEvent(self, event):
 		"""クリックイベント"""
 		if event.button() == Qt.LeftButton:
@@ -106,11 +91,7 @@ class Button(ActivityBar):
 		self.win = window
 	
 	def button(self):
-		self.btn = super().button()
-		self.btn.setObjectName("git_btn")
-		self.icon_color(f"{self.win.DIR}/assets/git.svg")
-		self.btn.setIcon(QIcon(f"{self.win.DIR}/assets/git.svg"))
-		return self.btn
+		return super().button(name="git_btn", icon_path=f"{self.win.DIR}/assets/git.svg")
 
 class Main(SideBar):
 	def __init__(self, window=None, index=2):
@@ -353,39 +334,8 @@ class Main(SideBar):
 	
 	def runGit(self, args, show_error=True):
 		"""Gitコマンド実行"""
-		try:
-			cwd = QDir.currentPath()
-			if os.name == 'nt':
-				si = subprocess.STARTUPINFO()
-				si.dwFlags = subprocess.STARTF_USESHOWWINDOW
-				result = subprocess.run(
-					['git'] + args,
-					capture_output=True,
-					text=True,
-					encoding='utf-8',
-					errors='replace',
-					cwd=cwd,
-					startupinfo=si
-				)
-			else:
-				result = subprocess.run(
-					['git'] + args,
-					capture_output=True,
-					text=True,
-					encoding='utf-8',
-					errors='replace',
-					cwd=cwd
-				)
-			
-			if result.returncode != 0:
-				if show_error:
-					self.status_bar.setText(f"⚠ {result.stderr.strip()[:50]}")
-				return None
-			return result.stdout.strip()
-		except:
-			if show_error:
-				self.status_bar.setText("⚠ Gitが見つかりません")
-			return None
+		callback = (lambda msg: self.status_bar.setText(msg)) if show_error else None
+		return run_git(args, show_error=show_error, error_callback=callback)
 	
 	def refresh(self):
 		"""状態更新"""

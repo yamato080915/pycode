@@ -15,13 +15,12 @@ import platform
 from AddonManager import AddonManager
 from Color import css_color, icon_color
 from pygments.lexers import guess_lexer
+from utils import get_startupinfo, run_subprocess, apply_text_options, reset_highlighter
 
 OS = platform.system()
 DIR = os.getcwd()
 
 if OS == "Windows":
-	si = subprocess.STARTUPINFO()
-	si.dwFlags = subprocess.STARTF_USESHOWWINDOW
 	import ctypes
 	ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pycode2')
 	embedded_python = f"{DIR}/python/python.exe"
@@ -29,10 +28,7 @@ else:
 	embedded_python = f"python3"
 
 def getpyversion():
-	if OS == "Windows":
-		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True, startupinfo=si)
-	else:
-		PYV = subprocess.run([embedded_python, '-V'], capture_output=True, text=True)
+	PYV = run_subprocess([embedded_python, '-V'], capture_output=True, text=True)
 	return PYV.stdout.strip()
 PYV = getpyversion()
 STYLE = "onedarkpro"
@@ -176,15 +172,9 @@ class Window(QMainWindow):
 				if any((pid, name) for pid, name in self.ConsoleGroup.terminals[0].running):
 					flag = True
 				if flag and not self.running:
-					bg_color = STYLE["theme"]["status_bar"]["running"]["background"]
-					fg_color = STYLE["theme"]["status_bar"]["running"]["foreground"]
-					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
-					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+					self.update_status_bar_style("running")
 				elif not flag and self.running:
-					bg_color = STYLE["theme"]["status_bar"]["normal"]["background"]
-					fg_color = STYLE["theme"]["status_bar"]["normal"]["foreground"]
-					self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
-					self.permanent_message.setStyleSheet(f"color: {fg_color};")
+					self.update_status_bar_style("normal")
 				self.running = flag
 			except IndexError:
 				pass
@@ -194,6 +184,21 @@ class Window(QMainWindow):
 				print("Status Bar Update Error:", e)
 			finally:
 				time.sleep(0.03)
+
+	def update_status_bar_style(self, state):
+		"""ステータスバーのスタイルを更新"""
+		bg_color = STYLE["theme"]["status_bar"][state]["background"]
+		fg_color = STYLE["theme"]["status_bar"][state]["foreground"]
+		self.status_bar.setStyleSheet(f"#status_bar {{ background-color: {bg_color};}}")
+		self.permanent_message.setStyleSheet(f"color: {fg_color};")
+
+	def focus_existing_tab(self, file_path):
+		"""既に開いているタブにフォーカス。存在すればTrue、なければFalseを返す"""
+		if file_path in self.tabfilelist:
+			tab_index = self.tabfilelist.index(file_path)
+			self.tabs.setCurrentIndex(tab_index)
+			return True
+		return False
 
 	def newtab(self, name=None, path=None):#新しいテキストファイル
 		if len(self.tabfilelist) == 1 and self.tabfilelist[0] == None and self.maybe_save(0):
@@ -209,10 +214,7 @@ class Window(QMainWindow):
 		self.tablist.append(Editor())
 		self.tablist[-1].setFont(self.FONT)
 		
-		options = QTextOption()
-		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
-		options.setWrapMode(QTextOption.WrapMode.WordWrap if self.word_wrap else QTextOption.WrapMode.NoWrap)
-		self.tablist[-1].document().setDefaultTextOption(options)
+		apply_text_options(self.tablist[-1], wrap=self.word_wrap)
 		self.tablist[-1].highlighter = Highlighter(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
 		
 		self.tabs.addTab(self.tablist[-1], name)
@@ -222,11 +224,8 @@ class Window(QMainWindow):
 		self.tabfilelist.append(None)
 		self.tablist.append(DiffViewer(self))
 		self.tablist[-1].setFont(self.FONT)
-		options = QTextOption()
-		options.setTabStopDistance(QFontMetrics(self.tablist[-1].font()).horizontalAdvance(' ') * 4)
-		options.setWrapMode(QTextOption.WrapMode.NoWrap)
-		self.tablist[-1].difftxt1.document().setDefaultTextOption(options)
-		self.tablist[-1].difftxt2.document().setDefaultTextOption(options)
+		apply_text_options(self.tablist[-1].difftxt1, wrap=False)
+		apply_text_options(self.tablist[-1].difftxt2, wrap=False)
 		lexer = guess_lexer(text1)
 		self.tablist[-1].difftxt1.highlighter = Highlighter(window=self,parent=self.tablist[-1].difftxt1.document(), style=STYLE["highlight"], lexer=lexer)
 		self.tablist[-1].difftxt2.highlighter = Highlighter(window=self,parent=self.tablist[-1].difftxt2.document(), style=STYLE["highlight"], lexer=lexer)
@@ -253,9 +252,7 @@ class Window(QMainWindow):
 	def open_file(self):#ファイルを開く
 		file_paths, _ = QFileDialog.getOpenFileNames(self, "ファイルを開く", "", "All Files (*.*)")
 		for file_path in file_paths:
-			if file_path in self.tabfilelist:
-				tab_index = self.tabfilelist.index(file_path)
-				self.tabs.setCurrentIndex(tab_index)
+			if self.focus_existing_tab(file_path):
 				continue
 			self.open_(file_path)
 
@@ -341,9 +338,7 @@ class Window(QMainWindow):
 	
 	def open_file_from_tree(self, index):#ファイルツリーから開く(クリック)
 		file_path = self.sidebar.explorer.file_model.filePath(index)
-		if file_path in self.tabfilelist:
-			tab_index = self.tabfilelist.index(file_path)
-			self.tabs.setCurrentIndex(tab_index)
+		if self.focus_existing_tab(file_path):
 			return
 		if QFileInfo(file_path).isFile():
 			self.open_(file_path)
@@ -356,13 +351,7 @@ class Window(QMainWindow):
 		for tab in self.tablist:
 			if hasattr(tab, 'textCursor'):
 				continue
-			options = QTextOption()
-			options.setTabStopDistance(QFontMetrics(tab.font()).horizontalAdvance(' ') * 4)
-			if checked:
-				options.setWrapMode(QTextOption.WrapMode.WordWrap)
-			else:
-				options.setWrapMode(QTextOption.WrapMode.NoWrap)
-			tab.document().setDefaultTextOption(options)
+			apply_text_options(tab, wrap=checked)
 		self.settings.setValue("wordWrap", checked)
 
 	def open_search_sidebar(self):#サイドバーの検索を開く
@@ -402,19 +391,11 @@ class Window(QMainWindow):
 				# DiffViewerの場合は両方のエディタを更新
 				for editor in [tab.difftxt1, tab.difftxt2]:
 					editor.setFont(self.FONT)
-					editor.highlighter.formats.clear()
-					editor.highlighter.replace.clear()
-					editor.highlighter.style = STYLE["highlight"]
-					editor.highlighter.set_filetype(None)
-					editor.highlighter.rehighlight()
+					reset_highlighter(editor.highlighter, STYLE["highlight"])
 				# 差分ハイライトも再適用
 				tab.reapply_theme()
 			elif hasattr(tab, 'highlighter'):
-				tab.highlighter.formats.clear()
-				tab.highlighter.replace.clear()
-				tab.highlighter.style = STYLE["highlight"]
-				tab.highlighter.set_filetype(tab.file_path if hasattr(tab, 'file_path') else None)
-				tab.highlighter.rehighlight()
+				reset_highlighter(tab.highlighter, STYLE["highlight"], tab.file_path if hasattr(tab, 'file_path') else None)
 		for btn in self.ConsoleGroup.btn_group.buttons():
 			btn.setIcon(QIcon(f"{self.DIR}/assets/terminal.svg"))
 		self.ConsoleGroup.btn_group.button(self.ConsoleGroup.terminalstack.currentIndex()).setIcon(QIcon(f"{self.DIR}/assets/terminal-fill.svg"))
@@ -472,13 +453,11 @@ class Window(QMainWindow):
 		self.new_window()
 
 	def new_window(self):
-		if OS == "Windows":
-			subprocess.Popen(
-				[sys.executable, os.path.abspath(__file__)], 
-				startupinfo=si if OS == "Windows" else None
-			)
-		else:
-			subprocess.Popen([sys.executable, os.path.abspath(__file__)])
+		si = get_startupinfo()
+		kwargs = {}
+		if si:
+			kwargs['startupinfo'] = si
+		subprocess.Popen([sys.executable, os.path.abspath(__file__)], **kwargs)
 
 if __name__ == "__main__":
 	app = QApplication(sys.argv)

@@ -11,11 +11,7 @@ class managerBtn(ActivityBar):
 		self.win = window
 	
 	def button(self):
-		self.btn = super().button()
-		self.btn.setObjectName("manager_btn")
-		self.icon_color(f"{self.win.DIR}/AddonManager/manager.svg")
-		self.btn.setIcon(QIcon(f"{self.win.DIR}/AddonManager/manager.svg"))
-		return self.btn
+		return super().button(name="manager_btn", icon_path=f"{self.win.DIR}/AddonManager/manager.svg")
 
 class AddonManager:
 	def __init__(self, window=None):
