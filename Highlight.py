@@ -120,13 +120,15 @@ class Tokenizer(QObject):
 		self.finished.emit(token_cache)
 
 class Highlighter(QSyntaxHighlighter):
-	def __init__(self, window=None, parent=None, filename = "*.txt", style=None):
+	def __init__(self, window=None, parent=None, filename = "*.txt", style=None, lexer=None):
 		super().__init__(parent)
 		self.win = window
 		self.style = style
+		self.lexer = lexer
 		self.set_filetype(filename)
 		self.token_cache = {}
 		self.use_cache = False
+		self._signal_connected = False
 		
 		self.tokenize_timer = QTimer()
 		self.tokenize_timer.setSingleShot(True)
@@ -134,6 +136,7 @@ class Highlighter(QSyntaxHighlighter):
 		self.tokenize_timer.timeout.connect(self.tokenize)
 
 		self.document().contentsChange.connect(self.changed)
+		self._signal_connected = True
 		self.tokenize_thread = None
 		self.tokenize_worker = None
 	
@@ -157,13 +160,14 @@ class Highlighter(QSyntaxHighlighter):
 		self.tokenize_timer.start()
 	
 	def set_filetype(self, filename):
-		try:
-			self.lexer = get_lexer_for_filename(filename)
-		except ClassNotFound:
-			self.lexer = get_lexer_by_name("text")
-		except Exception as e:
-			print(f"Error getting lexer for {filename}: {e}")
-			self.lexer = get_lexer_by_name("text")
+		if filename and not(self.lexer):
+			try:
+				self.lexer = get_lexer_for_filename(filename)
+			except ClassNotFound:
+				self.lexer = get_lexer_by_name("text")
+			except Exception as e:
+				print(f"Error getting lexer for {filename}: {e}")
+				self.lexer = get_lexer_by_name("text")
 		lang = str(self.lexer).lstrip("<pygments.lexers.").rstrip("Lexer>")
 		self.formats = {}
 		self.replace = {}
@@ -197,7 +201,22 @@ class Highlighter(QSyntaxHighlighter):
 			self.formats[token] = token_format
 	
 	def tokenize(self):
-		self.document().contentsChange.disconnect(self.changed)
+		# スレッドが実行中の場合は待機
+		try:
+			if self.tokenize_thread and self.tokenize_thread.isRunning():
+				self.tokenize_thread.quit()
+				self.tokenize_thread.wait()
+		except RuntimeError:
+			# C++オブジェクトが既に削除されている場合は無視
+			pass
+		
+		# シグナルが接続されている場合のみ切断
+		if self._signal_connected:
+			try:
+				self.document().contentsChange.disconnect(self.changed)
+				self._signal_connected = False
+			except RuntimeError:
+				pass
 		
 		text = self.document().toPlainText()
 		self.token_cache.clear()
@@ -212,12 +231,20 @@ class Highlighter(QSyntaxHighlighter):
 		self.tokenize_thread.finished.connect(self.tokenize_thread.deleteLater)
 
 		self.tokenize_thread.start()
+	
 	def on_tokenize_finished(self, token_cache):
 		self.token_cache = token_cache
 
 		self.use_cache = True
 		self.rehighlight()
-		self.document().contentsChange.connect(self.changed)
+		
+		# シグナルが接続されていない場合のみ接続
+		if not self._signal_connected:
+			try:
+				self.document().contentsChange.connect(self.changed)
+				self._signal_connected = True
+			except RuntimeError:
+				pass
 	
 	def highlightBlock(self, text):
 		block_number = self.currentBlock().blockNumber()

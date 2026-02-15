@@ -15,6 +15,11 @@
 		},
 		"search": {
 			"background": "#add6ff"
+		},
+		"diff": {
+			"delete": [255, 200, 200],
+			"insert": [200, 255, 200],
+			"empty": [240, 240, 240]
 		}
 	},
 	"highlight": {
