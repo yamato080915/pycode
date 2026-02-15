@@ -263,6 +263,11 @@ class Window(QMainWindow):
 			QDir.setCurrent(folder_path)
 			self.settings.setValue("workspace", folder_path)
 			self.ConsoleGroup.add_terminal()
+			# Git Graph/Source Controlを更新
+			if hasattr(self.sec_sidebar, 'graph') and self.sec_sidebar.graph._loaded:
+				self.sec_sidebar.graph.loadGraph()
+			if hasattr(self.sidebar, 'git') and self.sidebar.git._connected:
+				self.sidebar.git.refresh()
 
 	def save_file(self):#保存
 		current_tab = self.tablist[self.tabs.currentIndex()]

@@ -1,74 +1,35 @@
 from addons.AddonBase import SecondarySideBar
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QIcon, Qt, QColor, QFont, QPainter, QPen, QBrush
+from PySide6.QtGui import QIcon, Qt, QColor, QFont, QPainter, QPen, QBrush, QPainterPath
 from PySide6.QtCore import QTimer, QDir, QRect, QPoint, Signal, QFileSystemWatcher
 from Git.common import get_status_icon, get_status_color, run_git
 import os
-import re
-from datetime import datetime
 
-class CommitFileItem(QWidget):
-	"""コミットの変更ファイルアイテム"""
-	clicked = Signal(str, str)  # file_path, status
-	
-	def __init__(self, file_path, status, parent=None):
-		super().__init__(parent)
-		self.file_path = file_path
-		self.status = status
-		
-		layout = QHBoxLayout()
-		layout.setContentsMargins(8, 4, 8, 4)
-		layout.setSpacing(8)
-		
-		# ステータスアイコン
-		status_icon = QLabel(get_status_icon(status))
-		status_icon.setFont(QFont("Segoe UI", 10))
-		status_icon.setFixedWidth(20)
-		layout.addWidget(status_icon)
-		
-		# ファイル名
-		file_name = QLabel(os.path.basename(file_path))
-		file_name.setFont(QFont("Segoe UI", 9))
-		file_name.setStyleSheet(f"color: {get_status_color(status)};")
-		layout.addWidget(file_name, 1)
-		
-		# パス表示
-		if os.path.dirname(file_path):
-			path_label = QLabel(os.path.dirname(file_path))
-			path_label.setFont(QFont("Segoe UI", 8))
-			path_label.setStyleSheet("color: #858585;")
-			layout.addWidget(path_label)
-		
-		self.setLayout(layout)
-		self.setStyleSheet("""
-			QWidget:hover {
-				background: #2A2D2E;
-				border-left: 2px solid #007ACC;
-			}
-		""")
-	
-	def get_status_icon(self, status):
-		"""ステータスアイコン"""
-		icons = {
-			'M': '◆', 'A': '+', 'D': '−', 'R': '→', 'U': '?', 'C': '©', 'T': '≠'
-		}
-		return icons.get(status, '•')
-	
-	def get_status_color(self, status):
-		"""ステータスカラー"""
-		colors = {
-			'M': '#E5C07B', 'A': '#98C379', 'D': '#E06C75',
-			'R': '#61AFEF', 'U': '#4EC9B0', 'C': '#C678DD', 'T': '#56B6C2'
-		}
-		return colors.get(status, '#ABB2BF')
-	
-	def mousePressEvent(self, event):
-		"""クリックイベント"""
-		if event.button() == Qt.LeftButton:
-			self.clicked.emit(self.file_path, self.status)
+# ─── スタイル定数 ─────────────────────────────────────────
+_MENU_STYLE = """
+	QMenu {
+		background: #252526; color: #CCCCCC;
+		border: 1px solid #3E3E42; padding: 4px 0;
+	}
+	QMenu::item { padding: 6px 24px; }
+	QMenu::item:selected { background: #094771; }
+	QMenu::separator { height: 1px; background: #3E3E42; margin: 4px 8px; }
+"""
+_TOOLBAR_STYLE = "background: #2D2D30; padding: 5px;"
+_SEARCH_STYLE = """
+	QLineEdit {
+		background: #252526; color: #CCCCCC;
+		border: 1px solid #3E3E42; border-radius: 3px; padding: 4px 8px;
+	}
+	QLineEdit:focus { border-color: #007ACC; }
+"""
+
 
 class CommitItem:
-	"""シンプルなコミット情報を保持するクラス"""
+	"""コミット情報を保持するデータクラス"""
+	__slots__ = ('hash', 'parents', 'message', 'author', 'date', 'refs',
+				 'branch', 'color_index', 'visible')
+
 	def __init__(self, hash, parents, message, author, date, refs):
 		self.hash = hash
 		self.parents = parents
@@ -78,183 +39,205 @@ class CommitItem:
 		self.refs = refs
 		self.branch = 0
 		self.color_index = 0
+		self.visible = True
+
 
 class CompactGraphWidget(QWidget):
-	"""コンパクトなGitグラフを描画するウィジェット"""
+	"""Gitグラフを描画するウィジェット"""
 	commitSelected = Signal(CommitItem)
-	fileClicked = Signal(str, str, CommitItem)  # file_path, status, commit
-	
+	fileClicked = Signal(str, str, CommitItem)
+
+	# カラーパレット
+	COLORS = [
+		QColor("#66D9EF"), QColor("#A6E22E"), QColor("#F92672"),
+		QColor("#FD971F"), QColor("#AE81FF"), QColor("#E6DB74"),
+		QColor("#56B6C2"), QColor("#C678DD"),
+	]
+
 	def __init__(self, parent=None):
 		super().__init__(parent)
-		self.commits = []
+		self.all_commits = []
+		self.commits = []       # フィルタ後の表示用
 		self.row_height = 32
 		self.branch_width = 20
 		self.node_size = 6
-		self.current_branch_head = None  # 現在のブランチのHEAD
-		self.detail_height = 0  # 詳細パネルの高さ
-		self.selected_index = -1  # 選択されたコミットのインデックス
-		self.selected_commit_files = []  # 選択されたコミットのファイル一覧
-		self.file_rects = []  # ファイルのクリック可能領域 [(rect, file_path, status), ...]
-		self.setMinimumHeight(50)
-		
-		# カラーパレット（パステル調）
-		self.colors = [
-			QColor("#66D9EF"),  # シアン
-			QColor("#A6E22E"),  # グリーン
-			QColor("#F92672"),  # マゼンタ
-			QColor("#FD971F"),  # オレンジ
-			QColor("#AE81FF"),  # パープル
-			QColor("#E6DB74"),  # イエロー
-		]
-		
-		self.branch_map = {}
+		self.current_branch_head = None
+
+		self.detail_height = 0
+		self.selected_index = -1
+		self.selected_commit_files = []
+		self.file_rects = []
 		self.selected = None
 		self.hover_commit = None
-		
-		# マウストラッキングを有効化
+
+		self.branch_map = {}
+		self.setMinimumHeight(50)
 		self.setMouseTracking(True)
-	
+
+	# ─── データ設定 ───────────────────────────────────────
 	def setCommits(self, commits, current_head=None):
-		"""コミットを設定してレイアウト計算"""
-		self.commits = commits
+		self.all_commits = commits
+		self.commits = [c for c in commits if c.visible]
 		self.current_branch_head = current_head
-		self.calculateBranches()
-		self.updateHeight()
+		self._resetSelection()
+		self._calculateBranches()
+		self._updateHeight()
 		self.update()
-	
-	def updateHeight(self):
-		"""ウィジェットの高さを更新"""
-		total_height = len(self.commits) * self.row_height + 30
-		if self.selected_index >= 0:
-			total_height += self.detail_height
-		self.setFixedHeight(total_height)
-	
-	def calculateBranches(self):
-		"""ブランチレーンを計算（簡易版）"""
-		self.branch_map.clear()
-		used_branches = []
-		next_branch = 0
-		
-		for i, commit in enumerate(self.commits):
-			# ブランチ番号を決定
-			if commit.hash in self.branch_map:
-				branch = self.branch_map[commit.hash]
+
+	def filterByText(self, text):
+		"""テキストでフィルタ"""
+		text = text.lower()
+		for c in self.all_commits:
+			if not text:
+				c.visible = True
 			else:
-				# 空いているブランチを探す
-				if used_branches:
-					available_branches = [b for b in used_branches if b not in [self.branch_map.get(c.hash, -1) for c in self.commits[i:]]]
-					if available_branches:
-						branch = min(available_branches)
-					else:
-						branch = next_branch
-						next_branch += 1
-				else:
-					branch = next_branch
-					next_branch += 1
-			
-			commit.branch = branch
-			commit.color_index = branch % len(self.colors)
-			
-			# 親コミットにブランチを割り当て
+				c.visible = (
+					text in c.message.lower()
+					or text in c.author.lower()
+					or text in c.hash[:10].lower()
+					or any(text in r.lower() for r in c.refs)
+				)
+		self.commits = [c for c in self.all_commits if c.visible]
+		self._resetSelection()
+		self._calculateBranches()
+		self._updateHeight()
+		self.update()
+
+	def _resetSelection(self):
+		self.selected = None
+		self.selected_index = -1
+		self.detail_height = 0
+		self.selected_commit_files = []
+		self.file_rects = []
+
+	# ─── レイアウト計算 ───────────────────────────────────
+	def _updateHeight(self):
+		total = len(self.commits) * self.row_height + 30
+		if self.selected_index >= 0:
+			total += self.detail_height
+		self.setFixedHeight(max(total, 50))
+
+	def _calculateBranches(self):
+		"""ブランチレーンを安定的に計算"""
+		self.branch_map.clear()
+		active_lanes = []  # 各レーンが接続中のハッシュ (None = 空き)
+		next_branch = 0
+
+		for commit in self.commits:
+			# このコミットに割り当て済みのレーンを探す
+			lane = -1
+			for i, target in enumerate(active_lanes):
+				if target == commit.hash:
+					lane = i
+					active_lanes[i] = None
+					break
+
+			if lane < 0:
+				# 空きレーンを探すか新規作成
+				for i, target in enumerate(active_lanes):
+					if target is None:
+						lane = i
+						break
+				if lane < 0:
+					lane = len(active_lanes)
+					active_lanes.append(None)
+
+			commit.branch = lane
+			commit.color_index = lane % len(self.COLORS)
+
+			# 親コミットにレーンを予約
 			for j, parent_hash in enumerate(commit.parents):
-				if parent_hash not in self.branch_map:
-					if j == 0:
-						# 第1親は同じブランチ
-						self.branch_map[parent_hash] = branch
-					else:
-						# マージ元は新しいブランチ
-						new_branch = next_branch
-						next_branch += 1
-						self.branch_map[parent_hash] = new_branch
-						used_branches.append(new_branch)
-	
+				already = False
+				for i, target in enumerate(active_lanes):
+					if target == parent_hash:
+						already = True
+						break
+				if already:
+					continue
+
+				if j == 0:
+					# 第1親は同じレーン
+					active_lanes[lane] = parent_hash
+				else:
+					# マージ元は空きレーンか新規
+					placed = False
+					for i, target in enumerate(active_lanes):
+						if target is None:
+							active_lanes[i] = parent_hash
+							placed = True
+							break
+					if not placed:
+						active_lanes.append(parent_hash)
+
+	# ─── 描画 ────────────────────────────────────────────
 	def paintEvent(self, event):
-		"""グラフ描画"""
+		if not self.commits:
+			return
 		painter = QPainter(self)
 		painter.setRenderHint(QPainter.Antialiasing)
-		
-		# 背景
 		painter.fillRect(self.rect(), QColor("#252526"))
-		
-		# ホバー・選択中の行の背景を描画（接続線の前に）
+
+		# 背景 (選択 / ホバー)
 		for i, commit in enumerate(self.commits):
-			y = self.getCommitY(i)
-			
+			y = self._commitY(i)
 			if commit == self.selected:
-				# 選択中の行
 				painter.fillRect(0, y, self.width(), self.row_height, QColor("#094771"))
 			elif commit == self.hover_commit:
-				# ホバー中の行
 				painter.fillRect(0, y, self.width(), self.row_height, QColor("#2A2D2E"))
-		
-		# 詳細パネルの背景
+
+		# 詳細パネル背景
 		if self.selected_index >= 0 and self.detail_height > 0:
-			detail_y = self.getCommitY(self.selected_index) + self.row_height
-			painter.fillRect(0, detail_y, self.width(), self.detail_height, QColor("#1E1E1E"))
+			dy = self._commitY(self.selected_index) + self.row_height
+			painter.fillRect(0, dy, self.width(), self.detail_height, QColor("#1E1E1E"))
 			painter.setPen(QColor("#3E3E42"))
-			painter.drawRect(0, detail_y, self.width() - 1, self.detail_height - 1)
-			
-			# 詳細情報を描画
-			self.drawDetail(painter, self.selected, detail_y)
-		
-		# 接続線を描画
+			painter.drawRect(0, dy, self.width() - 1, self.detail_height - 1)
+			self._drawDetail(painter, self.selected, dy)
+
+		# 接続線
+		commit_index = {c.hash: i for i, c in enumerate(self.commits)}
 		for i, commit in enumerate(self.commits):
-			for parent_hash in commit.parents:
-				parent = self.findCommit(parent_hash)
-				if parent:
-					self.drawLine(painter, commit, parent, i)
-		
-		# コミットノードとテキストを描画
+			for ph in commit.parents:
+				if ph in commit_index:
+					self._drawLine(painter, commit, self.commits[commit_index[ph]], i, commit_index[ph])
+
+		# ノード + テキスト
+		max_branch = max((c.branch for c in self.commits), default=0)
+		text_x = max_branch * self.branch_width + 45
 		for i, commit in enumerate(self.commits):
-			self.drawCommit(painter, commit, i)
-	
-	def getCommitY(self, index):
-		"""コミットのY座標を取得（詳細パネルを考慮）"""
+			self._drawCommit(painter, commit, i, text_x)
+
+	def _commitY(self, index):
 		if index <= self.selected_index or self.selected_index < 0:
 			return index * self.row_height
+		return index * self.row_height + self.detail_height
+
+	def _drawLine(self, painter, commit, parent, ci, pi):
+		sx = commit.branch * self.branch_width + 20
+		sy = self._commitY(ci) + 15
+		ex = parent.branch * self.branch_width + 20
+		ey = self._commitY(pi) + 15
+
+		color = self.COLORS[commit.color_index]
+		painter.setPen(QPen(color.darker(130), 1.5))
+
+		if commit.branch == parent.branch:
+			painter.drawLine(sx, sy, ex, ey)
 		else:
-			return index * self.row_height + self.detail_height
-	
-	def drawLine(self, painter, commit, parent, index):
-		"""接続線を描画"""
-		start_x = commit.branch * self.branch_width + 20
-		start_y = self.getCommitY(index) + 15
-		
-		parent_idx = self.commits.index(parent) if parent in self.commits else -1
-		if parent_idx >= 0:
-			end_x = parent.branch * self.branch_width + 20
-			end_y = self.getCommitY(parent_idx) + 15
-			
-			color = self.colors[commit.color_index]
-			pen = QPen(color.darker(130), 1.5)
-			painter.setPen(pen)
-			
-			if commit.branch == parent.branch:
-				# 直線
-				painter.drawLine(start_x, start_y, end_x, end_y)
-			else:
-				# ベジェ曲線
-				from PySide6.QtGui import QPainterPath
-				path = QPainterPath()
-				path.moveTo(start_x, start_y)
-				
-				mid_y = (start_y + end_y) / 2
-				path.cubicTo(start_x, mid_y, end_x, mid_y, end_x, end_y)
-				painter.drawPath(path)
-	
-	def drawCommit(self, painter, commit, index):
-		"""コミットノードとテキストを描画"""
+			path = QPainterPath()
+			path.moveTo(sx, sy)
+			my = (sy + ey) / 2
+			path.cubicTo(sx, my, ex, my, ex, ey)
+			painter.drawPath(path)
+
+	def _drawCommit(self, painter, commit, index, text_x):
 		x = commit.branch * self.branch_width + 20
-		y = self.getCommitY(index) + 15
-		
-		# ノード
-		color = self.colors[commit.color_index]
-		is_head = (self.current_branch_head and commit.hash == self.current_branch_head)
-		
+		y = self._commitY(index) + 15
+		color = self.COLORS[commit.color_index]
+		is_head = self.current_branch_head and commit.hash == self.current_branch_head
+
 		if is_head:
-			# 現在のブランチHEAD: 空洞の丸（○）
 			painter.setPen(QPen(color, 2))
-			painter.setBrush(QBrush(QColor("#252526")))  # 背景色で塗りつぶし
+			painter.setBrush(QBrush(QColor("#252526")))
 			painter.drawEllipse(QPoint(x, y), self.node_size + 2, self.node_size + 2)
 		elif commit == self.selected:
 			painter.setPen(QPen(QColor("#FFFFFF"), 2))
@@ -268,449 +251,448 @@ class CompactGraphWidget(QWidget):
 			painter.setPen(QPen(color.darker(120), 1))
 			painter.setBrush(QBrush(color))
 			painter.drawEllipse(QPoint(x, y), self.node_size, self.node_size)
-		
-		# テキスト
-		text_x = max([c.branch for c in self.commits]) * self.branch_width + 40
-		
-		# コミットハッシュ（最初に表示）
+
+		# ハッシュ
 		painter.setPen(QColor("#858585"))
-		font = QFont("Consolas", 8)
-		painter.setFont(font)
+		painter.setFont(QFont("Consolas", 8))
 		painter.drawText(text_x, y + 4, commit.hash[:7])
-		
-		# コミットメッセージ
+
+		# メッセージ
 		painter.setPen(QColor("#CCCCCC"))
-		font = QFont("Yu Gothic UI", 9)
-		painter.setFont(font)
-		message = commit.message[:35] + "..." if len(commit.message) > 35 else commit.message
-		painter.drawText(text_x + 60, y + 4, message)
-		
-		# ブランチ/タグ（あれば）
+		painter.setFont(QFont("Yu Gothic UI", 9))
+		avail = self.width() - text_x - 300
+		max_chars = max(20, avail // 7)
+		msg = commit.message[:max_chars] + "..." if len(commit.message) > max_chars else commit.message
+		painter.drawText(text_x + 60, y + 4, msg)
+
+		# refs
 		if commit.refs:
-			painter.setPen(QColor("#4EC9B0"))
-			font.setBold(True)
-			font.setPointSize(8)
-			painter.setFont(font)
-			ref_text = " ".join([f"◆{ref}" for ref in commit.refs[:2]])
-			painter.drawText(text_x + 280, y + 4, ref_text)
-			font.setBold(False)
-	
-	def drawDetail(self, painter, commit, y):
-		"""詳細情報を描画"""
+			ref_x = text_x + 60 + len(msg) * 8 + 10
+			for ref in commit.refs[:3]:
+				# バッジ描画
+				font = QFont("Yu Gothic UI", 8, QFont.Bold)
+				painter.setFont(font)
+				fm = painter.fontMetrics()
+				tw = fm.horizontalAdvance(ref) + 12
+				badge_rect = QRect(ref_x, y - 8, tw, 16)
+
+				if ref.startswith('🏷'):
+					bg = QColor("#3E3E42")
+					fg = QColor("#E6DB74")
+				else:
+					bg = QColor("#1B3A4B")
+					fg = QColor("#4EC9B0")
+
+				painter.setPen(Qt.NoPen)
+				painter.setBrush(QBrush(bg))
+				painter.drawRoundedRect(badge_rect, 3, 3)
+				painter.setPen(fg)
+				painter.drawText(badge_rect, Qt.AlignCenter, ref)
+				ref_x += tw + 4
+
+		# 作者 + 日付 (右端)
+		painter.setPen(QColor("#6A6A6A"))
+		painter.setFont(QFont("Yu Gothic UI", 8))
+		info = f"{commit.author}  {commit.date}"
+		iw = painter.fontMetrics().horizontalAdvance(info) + 12
+		painter.drawText(self.width() - iw, y + 4, info)
+
+	def _drawDetail(self, painter, commit, y):
 		if not commit:
 			return
-		
-		# ファイルクリック領域をクリア
 		self.file_rects.clear()
-		
-		painter.setPen(QColor("#CCCCCC"))
-		font = QFont("Consolas", 8)
-		painter.setFont(font)
-		
-		# コミット情報
-		info_y = y + 15
-		painter.drawText(20, info_y, f"COMMIT: {commit.hash}")
-		info_y += 15
-		painter.drawText(20, info_y, f"AUTHOR: {commit.author}")
-		info_y += 15
-		painter.drawText(20, info_y, f"DATE: {commit.date}")
-		info_y += 15
-		
+		font_mono = QFont("Consolas", 8)
+		font_ui = QFont("Yu Gothic UI", 9)
+
+		cy = y + 15
+		painter.setFont(font_mono)
 		painter.setPen(QColor("#569CD6"))
-		painter.drawText(20, info_y, "MESSAGE:")
-		info_y += 15
+		painter.drawText(20, cy, f"COMMIT  {commit.hash}")
+		cy += 18
+		painter.setPen(QColor("#CCCCCC"))
+		painter.drawText(20, cy, f"AUTHOR  {commit.author}")
+		cy += 18
+		painter.drawText(20, cy, f"DATE    {commit.date}")
+		cy += 18
+
 		painter.setPen(QColor("#D4D4D4"))
-		
-		# メッセージを複数行に分割
-		message_lines = [commit.message[i:i+80] for i in range(0, len(commit.message), 80)]
-		for line in message_lines[:3]:  # 最大3行
-			painter.drawText(40, info_y, line)
-			info_y += 15
-		
-		# ファイルリスト
+		painter.setFont(font_ui)
+		lines = [commit.message[i:i+90] for i in range(0, len(commit.message), 90)]
+		for line in lines[:3]:
+			painter.drawText(20, cy, line)
+			cy += 16
+
 		if self.selected_commit_files:
-			info_y += 10
+			cy += 8
 			painter.setPen(QColor("#4EC9B0"))
-			painter.drawText(20, info_y, f"📄 変更されたファイル ({len(self.selected_commit_files)}):")
-			info_y += 15
-			
-			# すべてのファイルを表示
-			for file_path, status in self.selected_commit_files:
-				file_y = info_y
-				
-				# ホバー背景
-				file_rect = QRect(30, file_y - 12, self.width() - 40, 15)
-				if file_rect.contains(self.mapFromGlobal(self.cursor().pos())):
-					painter.fillRect(file_rect, QColor("#2A2D2E"))
-				
-				# ファイル表示
-				color = get_status_color(status)
-				painter.setPen(QColor(color))
-				icon = get_status_icon(status)
-				painter.drawText(40, info_y, f"{icon} {file_path}")
-				
-				# クリック領域を記録
-				self.file_rects.append((file_rect, file_path, status))
-				info_y += 15
-	
-	def findCommit(self, hash):
-		"""ハッシュでコミット検索"""
-		for c in self.commits:
-			if c.hash == hash:
-				return c
-		return None
-	
+			painter.setFont(QFont("Yu Gothic UI", 9, QFont.Bold))
+			painter.drawText(20, cy, f"変更ファイル ({len(self.selected_commit_files)})")
+			cy += 18
+
+			painter.setFont(font_mono)
+			for fp, st in self.selected_commit_files:
+				fr = QRect(30, cy - 12, self.width() - 40, 16)
+				if fr.contains(self.mapFromGlobal(self.cursor().pos())):
+					painter.fillRect(fr, QColor("#2A2D2E"))
+
+				painter.setPen(QColor(get_status_color(st)))
+				painter.drawText(40, cy, f"{get_status_icon(st)} {fp}")
+				self.file_rects.append((fr, fp, st))
+				cy += 16
+
+	# ─── マウスイベント ───────────────────────────────────
 	def mousePressEvent(self, event):
-		"""クリック処理"""
-		# ファイルクリックをチェック
-		for rect, file_path, status in self.file_rects:
+		for rect, fp, st in self.file_rects:
 			if rect.contains(event.pos()):
-				self.fileClicked.emit(file_path, status, self.selected)
+				self.fileClicked.emit(fp, st, self.selected)
 				return
-		
-		# コミット行クリック
+
 		for i, commit in enumerate(self.commits):
-			y_start = self.getCommitY(i)
-			y_end = y_start + self.row_height
-			
-			# 行全体でクリック可能
-			if y_start <= event.pos().y() < y_end:
-				# 同じコミットをクリックした場合は折りたたみ
+			ys = self._commitY(i)
+			if ys <= event.pos().y() < ys + self.row_height:
 				if self.selected == commit and self.detail_height > 0:
-					self.selected = None
-					self.selected_index = -1
-					self.detail_height = 0
-					self.selected_commit_files = []
+					self._resetSelection()
 				else:
 					self.selected = commit
 					self.selected_index = i
-					self.detail_height = 90  # 詳細パネルの初期高さ（ファイル読み込み前）
+					self.detail_height = 90
 					self.commitSelected.emit(commit)
-				
-				self.updateHeight()
+				self._updateHeight()
 				self.update()
 				break
-	
+
 	def mouseMoveEvent(self, event):
-		"""マウスホバー処理"""
-		old_hover = self.hover_commit
+		old = self.hover_commit
 		self.hover_commit = None
-		
-		# ファイル領域のホバーチェック
-		is_over_file = False
-		for rect, file_path, status in self.file_rects:
-			if rect.contains(event.pos()):
-				is_over_file = True
-				break
-		
-		# カーソルを変更
-		if is_over_file:
-			self.setCursor(Qt.PointingHandCursor)
-		else:
-			self.setCursor(Qt.ArrowCursor)
-		
+		over_file = any(r.contains(event.pos()) for r, _, _ in self.file_rects)
+		self.setCursor(Qt.PointingHandCursor if over_file else Qt.ArrowCursor)
+
 		for i, commit in enumerate(self.commits):
-			y_start = self.getCommitY(i)
-			y_end = y_start + self.row_height
-			
-			# 行全体でホバー可能
-			if y_start <= event.pos().y() < y_end:
+			ys = self._commitY(i)
+			if ys <= event.pos().y() < ys + self.row_height:
 				self.hover_commit = commit
 				break
-		
-		if old_hover != self.hover_commit:
+		if old != self.hover_commit:
 			self.update()
-	
+
+	def contextMenuEvent(self, event):
+		for i, commit in enumerate(self.commits):
+			ys = self._commitY(i)
+			if ys <= event.pos().y() < ys + self.row_height:
+				self._showCommitMenu(commit, event.globalPos())
+				return
+
+	def _showCommitMenu(self, commit, pos):
+		menu = QMenu(self)
+		menu.setStyleSheet(_MENU_STYLE)
+		menu.addAction(f"ハッシュをコピー ({commit.hash[:7]})",
+					   lambda: QApplication.clipboard().setText(commit.hash))
+		menu.addAction("メッセージをコピー",
+					   lambda: QApplication.clipboard().setText(commit.message))
+		menu.addSeparator()
+		menu.addAction("このコミットにチェックアウト",
+					   lambda: self._checkoutCommit(commit))
+		menu.addAction("このコミットからブランチ作成",
+					   lambda: self._branchFromCommit(commit))
+		menu.addSeparator()
+		menu.addAction("Revert (打ち消し)",
+					   lambda: self._revertCommit(commit))
+		menu.exec_(pos)
+
+	def _checkoutCommit(self, commit):
+		reply = QMessageBox.question(
+			self, 'チェックアウト', f'{commit.hash[:7]} にチェックアウトしますか？\n(detached HEAD になります)',
+			QMessageBox.Yes | QMessageBox.No
+		)
+		if reply == QMessageBox.Yes:
+			run_git(['checkout', commit.hash])
+
+	def _branchFromCommit(self, commit):
+		name, ok = QInputDialog.getText(self, '新ブランチ', f'{commit.hash[:7]} からブランチを作成:')
+		if ok and name:
+			run_git(['checkout', '-b', name, commit.hash])
+
+	def _revertCommit(self, commit):
+		reply = QMessageBox.warning(
+			self, 'Revert', f'{commit.hash[:7]} を打ち消しますか？',
+			QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+		)
+		if reply == QMessageBox.Yes:
+			run_git(['revert', '--no-edit', commit.hash])
+
 	def setCommitFiles(self, files):
-		"""選択されたコミットのファイル一覧を設定"""
 		self.selected_commit_files = files
-		
-		# ファイル数に応じて詳細パネルの高さを調整
 		if self.selected_index >= 0:
-			# 基本情報（COMMIT, AUTHOR, DATE）: 15px × 3 = 45px
-			# MESSAGE ヘッダー + メッセージ（最大3行）: 15px + 15px × 3 = 60px
-			# ファイルリストヘッダー: 10px（余白） + 15px = 25px
-			# 下部余白: 15px
-			base_height = 145
-			# ファイル1つにつき15px
-			file_height = len(files) * 15
-			self.detail_height = base_height + file_height
-			self.updateHeight()
-		
+			base = 145
+			fh = len(files) * 16
+			self.detail_height = base + fh
+			self._updateHeight()
 		self.update()
 
+
 class Main(SecondarySideBar):
-	"""SecondarySideBar用のGitGraphクラス"""
+	"""Git履歴グラフパネル"""
 	def __init__(self, window=None):
 		super().__init__()
 		self.name = "GitGraph"
 		self.description = "Compact Git History Graph"
-		self.version = "1.0.0"
+		self.version = "2.0.0"
 		self.win = window
 
 		self.icon_color(f"{window.DIR}/assets/gitgraph.svg")
 		self.icon = QIcon(f"{window.DIR}/assets/gitgraph.svg")
-		
+
 		self._loaded = False
-		
+
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)
 		layout.setSpacing(0)
-		
-		# ツールバー
+
+		# ═══ ツールバー ═══
 		toolbar = QWidget()
-		toolbar.setStyleSheet("background: #2D2D30; padding: 5px;")
-		toolbar_layout = QHBoxLayout()
-		toolbar_layout.setContentsMargins(8, 4, 8, 4)
-		
+		toolbar.setStyleSheet(_TOOLBAR_STYLE)
+		tb_layout = QHBoxLayout()
+		tb_layout.setContentsMargins(8, 4, 8, 4)
+
 		title = QLabel("Git履歴")
 		title.setStyleSheet("color: #CCCCCC; font-weight: bold; font-size: 11px;")
-		toolbar_layout.addWidget(title)
-		
-		toolbar_layout.addStretch()
-		
-		# コミット数制限
+		tb_layout.addWidget(title)
+		tb_layout.addStretch()
+
 		self.limit_combo = QComboBox()
-		self.limit_combo.addItems(["20", "50", "100", "200", "全て"])
+		self.limit_combo.addItems(["20", "50", "100", "200", "500", "全て"])
 		self.limit_combo.setCurrentText("50")
-		self.limit_combo.setFixedWidth(80)
+		self.limit_combo.setFixedWidth(70)
 		self.limit_combo.currentTextChanged.connect(self.loadGraph)
-		toolbar_layout.addWidget(self.limit_combo)
-		
-		# ブランチフィルター
+		tb_layout.addWidget(self.limit_combo)
+
 		self.branch_combo = QComboBox()
 		self.branch_combo.addItem("全て")
 		self.branch_combo.setFixedWidth(120)
 		self.branch_combo.currentTextChanged.connect(self.loadGraph)
-		toolbar_layout.addWidget(self.branch_combo)
-		
-		# 更新ボタン
+		tb_layout.addWidget(self.branch_combo)
+
 		refresh_btn = QPushButton("⟳")
 		refresh_btn.setFixedSize(28, 28)
 		refresh_btn.setToolTip("更新")
 		refresh_btn.clicked.connect(self.loadGraph)
-		toolbar_layout.addWidget(refresh_btn)
-		
-		toolbar.setLayout(toolbar_layout)
+		tb_layout.addWidget(refresh_btn)
+
+		toolbar.setLayout(tb_layout)
 		layout.addWidget(toolbar)
-		
-		# グラフエリア
+
+		# ═══ 検索バー ═══
+		self.search_input = QLineEdit()
+		self.search_input.setPlaceholderText("🔍 コミット/作者/ハッシュで検索...")
+		self.search_input.setStyleSheet(_SEARCH_STYLE)
+		self.search_input.setFixedHeight(28)
+		self.search_input.textChanged.connect(self._onSearchChanged)
+		layout.addWidget(self.search_input)
+
+		# ═══ グラフエリア ═══
 		scroll = QScrollArea()
 		scroll.setWidgetResizable(True)
 		scroll.setStyleSheet("QScrollArea { border: none; background: #252526; }")
-		
+
 		self.graph = CompactGraphWidget()
 		self.graph.commitSelected.connect(self.showDetails)
 		self.graph.fileClicked.connect(self.onCommitFileClicked)
 		scroll.setWidget(self.graph)
-		
 		layout.addWidget(scroll, 1)
-		
-		# ステータスバー
+
+		# ═══ ステータスバー ═══
 		self.status = QLabel("準備完了")
 		self.status.setStyleSheet("background: #007ACC; color: white; padding: 4px 8px; font-size: 9px;")
 		layout.addWidget(self.status)
-		
+
 		self.setLayout(layout)
-		
-		# ブランチ移動の監視を設定
+
+		# ブランチ変更監視
 		self.file_watcher = QFileSystemWatcher()
 		self.current_branch = None
-		self.setupBranchWatcher()
-	
-	def setupBranchWatcher(self):
-		"""ブランチ移動の監視をセットアップ"""
+		self._setupWatcher()
+
+		# 検索デバウンス
+		self._search_timer = QTimer()
+		self._search_timer.setSingleShot(True)
+		self._search_timer.setInterval(300)
+		self._search_timer.timeout.connect(self._applySearchFilter)
+
+	# ─── 監視 ────────────────────────────────────────────
+	def _setupWatcher(self):
 		try:
-			git_dir = os.path.join(QDir.currentPath(), '.git')
-			
-			# .git/HEAD ファイルを監視
-			head_file = os.path.join(git_dir, 'HEAD')
-			if os.path.exists(head_file):
-				self.file_watcher.addPath(head_file)
-				self.file_watcher.fileChanged.connect(self.onBranchChanged)
-				
-				# 現在のブランチを保存
-				self.current_branch = self.getCurrentBranch()
-		except Exception as e:
-			print(f"Branch watcher setup failed: {e}")
-	
-	def getCurrentBranch(self):
-		"""現在のブランチ名を取得"""
-		output = self.runGit(['branch', '--show-current'])
-		return output if output else None
-	
-	def onBranchChanged(self, path):
-		"""ブランチが変更された時の処理"""
-		new_branch = self.getCurrentBranch()
-		if new_branch != self.current_branch:
-			self.current_branch = new_branch
+			head = os.path.join(QDir.currentPath(), '.git', 'HEAD')
+			if os.path.exists(head):
+				self.file_watcher.addPath(head)
+				self.file_watcher.fileChanged.connect(self._onBranchChanged)
+				self.current_branch = self._getCurrentBranch()
+		except Exception:
+			pass
+
+	def _getCurrentBranch(self):
+		return run_git(['branch', '--show-current']) or None
+
+	def _onBranchChanged(self, path):
+		new = self._getCurrentBranch()
+		if new != self.current_branch:
+			self.current_branch = new
 			if self._loaded:
-				self.status.setText(f"🔄 ブランチ変更検知: {new_branch}")
+				self.status.setText(f"🔄 ブランチ変更: {new}")
 				self.loadGraph()
-				
-				# HEADファイルの監視を再設定（一部のシステムで必要）
-				git_dir = os.path.join(QDir.currentPath(), '.git')
-				head_file = os.path.join(git_dir, 'HEAD')
-				if head_file not in self.file_watcher.files():
-					self.file_watcher.addPath(head_file)
-	
+				# 監視再設定
+				head = os.path.join(QDir.currentPath(), '.git', 'HEAD')
+				if head not in self.file_watcher.files():
+					self.file_watcher.addPath(head)
+
+	# ─── ライフサイクル ───────────────────────────────────
 	def showEvent(self, event):
-		"""表示時に読み込み"""
 		if not self._loaded:
 			self.loadGraph()
 			self._loaded = True
 		return super().showEvent(event)
-	
+
 	def runGit(self, args):
-		"""Gitコマンド実行"""
 		return run_git(args)
-	
+
+	# ─── 検索 ────────────────────────────────────────────
+	def _onSearchChanged(self, text):
+		self._search_timer.start()
+
+	def _applySearchFilter(self):
+		text = self.search_input.text().strip()
+		self.graph.filterByText(text)
+		visible = len(self.graph.commits)
+		total = len(self.graph.all_commits)
+		if text:
+			self.status.setText(f"🔍 {visible}/{total} コミット (フィルタ中)")
+		else:
+			self.status.setText(f"✓ {total} コミット")
+
+	# ─── グラフ読み込み ───────────────────────────────────
 	def loadGraph(self):
-		"""グラフを読み込み"""
 		self.status.setText("📡 読み込み中...")
-		
-		# 現在のブランチのHEADを取得
 		current_head = self.runGit(['rev-parse', 'HEAD'])
-		
-		# ブランチリスト更新
-		self.updateBranches()
-		
-		# コミット取得
+		self._updateBranches()
+
 		limit_text = self.limit_combo.currentText()
 		limit = 999999 if limit_text == "全て" else int(limit_text)
-		
+
 		branch_text = self.branch_combo.currentText()
 		branch = None if branch_text.startswith("全") else branch_text
-		
+
 		args = ['log', '--format=%H|%P|%s|%an|%ad|%D', '--date=short', '--date-order']
 		if branch:
 			args.append(branch)
 		else:
 			args.append('--all')
 		args.append(f'--max-count={limit}')
-		
+
 		output = self.runGit(args)
 		if not output:
 			self.status.setText("❌ Gitリポジトリが見つかりません")
 			self.graph.setCommits([])
 			return
-		
-		# パース
+
 		commits = []
 		for line in output.split('\n'):
 			if not line:
 				continue
-			
 			parts = line.split('|', 5)
-			if len(parts) >= 5:
-				hash = parts[0]
-				parents = parts[1].split() if parts[1] else []
-				message = parts[2]
-				author = parts[3]
-				date = parts[4]
-				refs_raw = parts[5] if len(parts) > 5 else ""
-				
-				# リファレンス抽出
-				refs = []
-				if refs_raw:
-					for ref in refs_raw.split(','):
-						ref = ref.strip()
-						if 'HEAD ->' in ref:
-							refs.append(ref.split('HEAD -> ')[1])
-						elif 'tag:' in ref:
-							refs.append('🏷️' + ref.split('tag: ')[1])
-						elif not ref.startswith('origin/'):
-							refs.append(ref)
-				
-				commit = CommitItem(hash, parents, message, author, date, refs)
-				commits.append(commit)
-		
+			if len(parts) < 5:
+				continue
+			refs = []
+			if len(parts) > 5 and parts[5]:
+				for r in parts[5].split(','):
+					r = r.strip()
+					if 'HEAD ->' in r:
+						refs.append(r.split('HEAD -> ')[1])
+					elif 'tag:' in r:
+						refs.append('🏷' + r.split('tag: ')[1])
+					elif r and not r.startswith('origin/'):
+						refs.append(r)
+
+			commits.append(CommitItem(
+				parts[0], parts[1].split() if parts[1] else [],
+				parts[2], parts[3], parts[4], refs
+			))
+
 		self.graph.setCommits(commits, current_head)
-		self.status.setText(f"✓ {len(commits)} コミット")
-	
-	def updateBranches(self):
-		"""ブランチリスト更新"""
-		output = self.runGit(['branch'])
-		if output:
-			self.branch_combo.blockSignals(True)
-			current = self.branch_combo.currentText()
-			self.branch_combo.clear()
-			self.branch_combo.addItem("全て")
-			
-			for line in output.split('\n'):
-				branch = line.strip().lstrip('* ').strip()
-				if branch:
-					self.branch_combo.addItem(branch)
-			
-			idx = self.branch_combo.findText(current)
-			if idx >= 0:
-				self.branch_combo.setCurrentIndex(idx)
-			self.branch_combo.blockSignals(False)
-	
+
+		# 検索フィルタ再適用
+		text = self.search_input.text().strip()
+		if text:
+			self.graph.filterByText(text)
+			self.status.setText(f"🔍 {len(self.graph.commits)}/{len(commits)} コミット")
+		else:
+			self.status.setText(f"✓ {len(commits)} コミット")
+
+	def _updateBranches(self):
+		output = self.runGit(['branch', '-a'])
+		if not output:
+			return
+		self.branch_combo.blockSignals(True)
+		current = self.branch_combo.currentText()
+		self.branch_combo.clear()
+		self.branch_combo.addItem("全て")
+
+		local_branches = []
+		remote_branches = []
+		for line in output.split('\n'):
+			branch = line.strip().lstrip('* ').strip()
+			if not branch or 'HEAD' in branch:
+				continue
+			if branch.startswith('remotes/'):
+				remote_branches.append(branch.replace('remotes/', ''))
+			else:
+				local_branches.append(branch)
+
+		for b in local_branches:
+			self.branch_combo.addItem(b)
+		if remote_branches:
+			self.branch_combo.insertSeparator(self.branch_combo.count())
+			for b in remote_branches:
+				self.branch_combo.addItem(b)
+
+		idx = self.branch_combo.findText(current)
+		if idx >= 0:
+			self.branch_combo.setCurrentIndex(idx)
+		self.branch_combo.blockSignals(False)
+
+	# ─── 詳細 ────────────────────────────────────────────
 	def showDetails(self, commit):
-		"""詳細表示"""
-		self.status.setText(f"✓ {commit.hash[:7]} selected")
-		
-		# 変更ファイルを取得して表示
-		self.loadCommitFiles(commit)
-	
-	def loadCommitFiles(self, commit):
-		"""コミットの変更ファイルを取得して表示"""
-		# 変更ファイルを取得
+		self.status.setText(f"✓ {commit.hash[:7]} — {commit.author}")
+		self._loadCommitFiles(commit)
+
+	def _loadCommitFiles(self, commit):
 		if commit.parents:
-			# 通常のコミット: 親との差分
 			output = self.runGit(['diff', '--name-status', f'{commit.parents[0]}..{commit.hash}'])
 		else:
-			# 初回コミット
 			output = self.runGit(['diff-tree', '--no-commit-id', '--name-status', '-r', commit.hash])
-		
-		if not output:
-			self.graph.setCommitFiles([])
-			return
-		
-		# ファイルをパース
+
 		files = []
-		for line in output.split('\n'):
-			if line.strip():
-				parts = line.split('\t', 1)
-				if len(parts) >= 2:
-					status = parts[0].strip()
-					file_path = parts[1].strip()
-					files.append((file_path, status))
-		
-		# グラフウィジェットにファイル情報を渡す
+		if output:
+			for line in output.split('\n'):
+				if line.strip():
+					parts = line.split('\t', 1)
+					if len(parts) >= 2:
+						files.append((parts[1].strip(), parts[0].strip()))
 		self.graph.setCommitFiles(files)
-	
+
 	def onCommitFileClicked(self, file_path, status, commit):
-		"""コミットファイルがクリックされた時"""
-		# commitがNoneの場合は何もしない
 		if not commit:
 			return
-		
-		# 差分を表示
 		if status.startswith('D'):
-			# 削除されたファイル: 親コミットのファイル内容のみ
-			if commit.parents:
-				old_content = self.runGit(['show', f'{commit.parents[0]}:{file_path}']) or ""
-			else:
-				old_content = ""
-			new_content = ""
-			self.status.setText(f"🗑 削除: {os.path.basename(file_path)}")
+			old = self.runGit(['show', f'{commit.parents[0]}:{file_path}']) if commit.parents else ""
+			old = old or ""
+			new = ""
 		elif status.startswith('A'):
-			# 追加されたファイル: 新しいファイル内容のみ
-			old_content = ""
-			new_content = self.runGit(['show', f'{commit.hash}:{file_path}']) or ""
-			self.status.setText(f"➕ 追加: {os.path.basename(file_path)}")
+			old = ""
+			new = self.runGit(['show', f'{commit.hash}:{file_path}']) or ""
 		else:
-			# 変更されたファイル: 両方の内容を取得
-			if commit.parents:
-				old_content = self.runGit(['show', f'{commit.parents[0]}:{file_path}']) or ""
-			else:
-				old_content = ""
-			new_content = self.runGit(['show', f'{commit.hash}:{file_path}']) or ""
-			self.status.setText(f"📝 変更: {os.path.basename(file_path)}")
-		
-		# DiffViewerで表示
+			old = self.runGit(['show', f'{commit.parents[0]}:{file_path}']) if commit.parents else ""
+			old = old or ""
+			new = self.runGit(['show', f'{commit.hash}:{file_path}']) or ""
+
 		if self.win:
-			self.win.newdiffviewer(old_content, new_content, title=f"Diff: {file_path} ({commit.hash[:7]})")
+			self.win.newdiffviewer(old, new, title=f"Diff: {file_path} ({commit.hash[:7]})")
 
