@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QAction, QActionGroup
 import os
+from GoToDefinition import go_to_definition
 #from main import window as win
 
 class MenuBar:
@@ -103,6 +104,10 @@ class MenuBar:
 		replace_action.setShortcut("Ctrl+H")
 		replace_action.triggered.connect(self.window.open_search_sidebar)
 
+		goto_def_action = QAction("定義へ移動", self.window)
+		goto_def_action.setShortcut("F12")
+		goto_def_action.triggered.connect(lambda: go_to_definition(self.window))
+
 		self.edit_menu.addAction(undo_action)
 		self.edit_menu.addAction(redo_action)
 		self.edit_menu.addSeparator()
@@ -114,6 +119,8 @@ class MenuBar:
 		self.edit_menu.addSeparator()
 		self.edit_menu.addAction(search_action)
 		self.edit_menu.addAction(replace_action)
+		self.edit_menu.addSeparator()
+		self.edit_menu.addAction(goto_def_action)
 
 	def viewmenu(self):
 		self.view_menu = self.menubar.addMenu("表示(&V)")

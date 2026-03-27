@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QPlainTextEdit, QWidget, QTextEdit
-from PySide6.QtGui import QPainter, QColor, QTextFormat, QFont, QPen, QPolygon
-from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint
+from PySide6.QtGui import QPainter, QColor, QTextFormat, QFont, QPen, QPolygon, QCursor
+from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, Signal
 
 class MiniMap(QWidget):
 	def __init__(self, parent=None):
@@ -167,9 +167,13 @@ class FoldingArea(QWidget):
 		self.update()
 
 class Editor(QPlainTextEdit):
+	# 定義へ移動シグナル
+	go_to_definition_requested = Signal()
+	
 	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.setObjectName("TextBox")
+		self.setMouseTracking(True)  # Ctrl+クリック用にマウストラッキングを有効化
 		
 		self.line_number_area = LineNumberArea(self)
 		self.folding_area = FoldingArea(self)
@@ -524,3 +528,38 @@ class Editor(QPlainTextEdit):
 			top = bottom
 			bottom = top + self.blockBoundingRect(block).height()
 			block_number += 1
+	
+	# ============== Go to Definition Methods ==============
+	
+	def keyPressEvent(self, event):
+		"""F12で定義へ移動"""
+		if event.key() == Qt.Key.Key_F12:
+			self.go_to_definition_requested.emit()
+		else:
+			super().keyPressEvent(event)
+	
+	def mousePressEvent(self, event):
+		"""Ctrl+クリックで定義へ移動"""
+		if event.button() == Qt.MouseButton.LeftButton:
+			if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+				# Ctrl+クリックの場合、まずカーソルを移動
+				cursor = self.cursorForPosition(event.pos())
+				self.setTextCursor(cursor)
+				self.go_to_definition_requested.emit()
+				return
+		super().mousePressEvent(event)
+	
+	def mouseMoveEvent(self, event):
+		"""Ctrl押下中はカーソルを変更"""
+		if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+			# 単語の上にいるか確認
+			cursor = self.cursorForPosition(event.pos())
+			cursor.select(cursor.SelectionType.WordUnderCursor)
+			word = cursor.selectedText()
+			if word and word.isidentifier():
+				self.viewport().setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+			else:
+				self.viewport().setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+		else:
+			self.viewport().setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+		super().mouseMoveEvent(event)

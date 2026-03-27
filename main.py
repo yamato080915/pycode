@@ -16,6 +16,7 @@ from AddonManager import AddonManager
 from Color import css_color, icon_color
 from pygments.lexers import guess_lexer
 from utils import get_startupinfo, run_subprocess, apply_text_options, reset_highlighter
+from GoToDefinition import go_to_definition
 
 OS = platform.system()
 DIR = os.getcwd()
@@ -213,6 +214,9 @@ class Window(QMainWindow):
 			self.tabfilelist.append(None)
 		self.tablist.append(Editor())
 		self.tablist[-1].setFont(self.FONT)
+		
+		# 定義へ移動シグナルを接続
+		self.tablist[-1].go_to_definition_requested.connect(lambda: go_to_definition(self))
 		
 		apply_text_options(self.tablist[-1], wrap=self.word_wrap)
 		self.tablist[-1].highlighter = Highlighter(window=self,parent=self.tablist[-1].document(), filename=name, style=STYLE["highlight"])
