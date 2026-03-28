@@ -2,7 +2,7 @@
 import ast
 import os
 import re
-from Semantic import Semantic, SymbolKind, get_module_file
+from Semantic import Semantic, SymbolKind, SymbolInfo, get_module_file
 
 
 class DefinitionFinder:
@@ -38,8 +38,18 @@ class DefinitionFinder:
         
         return text[start:end]
     
-    def find_definition_in_text(self, text, symbol_name):
-        """テキスト内でシンボルの定義位置を検索"""
+    def find_definition_in_text(self, text, symbol_name, current_line=None):
+        """テキスト内でシンボルの定義位置を検索（スコープ対応）"""
+        # Semanticを使用してスコープを解析
+        semantic = Semantic(text)
+        
+        if current_line is not None:
+            # 現在の行からスコープチェーンを辿って検索
+            symbol_info = semantic.lookup(symbol_name, current_line)
+            if symbol_info and isinstance(symbol_info, SymbolInfo):
+                return symbol_info.lineno, self._get_name_col(text, symbol_info.lineno, symbol_name)
+        
+        # スコープで見つからない場合、従来の方法で検索
         try:
             tree = ast.parse(text)
         except SyntaxError:
@@ -77,8 +87,8 @@ class DefinitionFinder:
                 return match.start()
         return 0
     
-    def find_import_target(self, text, symbol_name):
-        """インポート文からシンボルのモジュールを検索"""
+    def find_import_target(self, text, symbol_name, current_line=None):
+        """インポート文からシンボルのモジュールを検索（スコープ対応）"""
         try:
             tree = ast.parse(text)
         except SyntaxError:
@@ -101,11 +111,11 @@ class DefinitionFinder:
                     if actual_name == symbol_name:
                         module_file = get_module_file(node.module)
                         if module_file:
-                            # モジュールファイル内でシンボルを検索
+                            # モジュールファイル内でシンボルを検索（スコープなしで検索）
                             try:
                                 with open(module_file, 'r', encoding='utf-8') as f:
                                     module_text = f.read()
-                                result = self.find_definition_in_text(module_text, alias.name)
+                                result = self.find_definition_in_text(module_text, alias.name, None)
                                 if result:
                                     return module_file, result[0]
                             except:
@@ -115,7 +125,7 @@ class DefinitionFinder:
         return None, None
     
     def find_definition(self, editor):
-        """カーソル位置のシンボルの定義を検索"""
+        """カーソル位置のシンボルの定義を検索（スコープ対応）"""
         cursor = editor.textCursor()
         line = cursor.blockNumber()
         col = cursor.columnNumber()
@@ -128,8 +138,11 @@ class DefinitionFinder:
         text = editor.document().toPlainText()
         file_path = getattr(editor, 'file_path', None)
         
-        # 同じファイル内で定義を検索
-        result = self.find_definition_in_text(text, word)
+        # 現在の行番号（1-indexed）
+        current_line = line + 1
+        
+        # スコープを使用して定義を検索
+        result = self.find_definition_in_text(text, word, current_line)
         if result:
             def_line, def_col = result
             return {
