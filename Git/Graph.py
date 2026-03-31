@@ -329,12 +329,27 @@ class CompactGraphWidget(QWidget):
 		if commit.branch == parent.branch:
 			painter.drawLine(sx, sy, ex, ey)
 		else:
+			# J字型カーブ: 垂直に下がってから横に曲がる
 			path = QPainterPath()
 			path.moveTo(sx, sy)
-			# より滑らかなカーブ
-			ctrl_y1 = sy + (ey - sy) * 0.4
-			ctrl_y2 = sy + (ey - sy) * 0.6
-			path.cubicTo(sx, ctrl_y1, ex, ctrl_y2, ex, ey)
+
+			# 曲がり始める位置（親ノードの少し上）
+			bend_y = ey - self.row_height * 0.4
+
+			# 垂直線
+			path.lineTo(sx, bend_y)
+
+			# 角丸で横に曲がる
+			radius = min(abs(ex - sx) * 0.5, self.row_height * 0.4)
+			if ex > sx:
+				# 右に曲がる
+				path.quadTo(sx, ey, sx + radius, ey)
+				path.lineTo(ex, ey)
+			else:
+				# 左に曲がる
+				path.quadTo(sx, ey, sx - radius, ey)
+				path.lineTo(ex, ey)
+
 			painter.drawPath(path)
 
 	def _drawCommit(self, painter, commit, index, text_x):
