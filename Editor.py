@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QPlainTextEdit, QWidget, QTextEdit
-from PySide6.QtGui import QPainter, QColor, QTextFormat, QFont, QPen, QPolygon
-from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint
+from PySide6.QtWidgets import QPlainTextEdit, QWidget, QTextEdit, QToolTip
+from PySide6.QtGui import QPainter, QColor, QTextFormat, QFont, QPen, QPolygon, QCursor, QTextCharFormat
+from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, Signal, QTimer
 
 class MiniMap(QWidget):
 	def __init__(self, parent=None):
@@ -167,9 +167,13 @@ class FoldingArea(QWidget):
 		self.update()
 
 class Editor(QPlainTextEdit):
+	# 定義へ移動シグナル
+	go_to_definition_requested = Signal()
+	
 	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.setObjectName("TextBox")
+		self.setMouseTracking(True)  # Ctrl+クリック用にマウストラッキングを有効化
 		
 		self.line_number_area = LineNumberArea(self)
 		self.folding_area = FoldingArea(self)
@@ -178,6 +182,14 @@ class Editor(QPlainTextEdit):
 		
 		self.minimap = MiniMap(self)
 		self._minimap_update_pending = False
+		
+		# ホバーツールチップ用
+		self._hover_timer = QTimer(self)
+		self._hover_timer.setSingleShot(True)
+		self._hover_timer.timeout.connect(self._show_hover_tooltip)
+		self._hover_global_pos = None
+		self._last_hover_word = None
+		self._hover_link_selection = None  # Ctrl+ホバー時のリンクスタイル選択
 		
 		self.blockCountChanged.connect(self.update_line_number_area_width)
 		self.updateRequest.connect(lambda rect, dy: self.update_line_number_area(rect, dy))
@@ -302,6 +314,10 @@ class Editor(QPlainTextEdit):
 			selection.cursor = self.textCursor()
 			selection.cursor.clearSelection()
 			extra_selections.append(selection)
+		
+		# Ctrl+ホバー時のリンクスタイル選択を追加
+		if self._hover_link_selection:
+			extra_selections.append(self._hover_link_selection)
 		
 		self.setExtraSelections(extra_selections)
 	
@@ -524,3 +540,119 @@ class Editor(QPlainTextEdit):
 			top = bottom
 			bottom = top + self.blockBoundingRect(block).height()
 			block_number += 1
+	
+	# ============== Go to Definition Methods ==============
+	
+	def keyPressEvent(self, event):
+		"""F12で定義へ移動"""
+		if event.key() == Qt.Key.Key_F12:
+			self.go_to_definition_requested.emit()
+		else:
+			super().keyPressEvent(event)
+	
+	def mousePressEvent(self, event):
+		"""Ctrl+クリックで定義へ移動"""
+		if event.button() == Qt.MouseButton.LeftButton:
+			if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+				# Ctrl+クリックの場合、まずカーソルを移動
+				cursor = self.cursorForPosition(event.pos())
+				self.setTextCursor(cursor)
+				self.go_to_definition_requested.emit()
+				return
+		super().mousePressEvent(event)
+	
+	def mouseMoveEvent(self, event):
+		"""Ctrl押下中はカーソルを変更してツールチップ表示"""
+		if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+			# Ctrl押下中は手カーソルとツールチップ
+			cursor = self.cursorForPosition(event.pos())
+			cursor.select(cursor.SelectionType.WordUnderCursor)
+			word = cursor.selectedText()
+			if word and word.isidentifier():
+				self.viewport().setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+				# リンクスタイル（青文字+下線）を適用
+				self._apply_link_style(cursor)
+				# Ctrl+ホバーでツールチップをスケジュール
+				self._schedule_hover_tooltip(event.globalPosition().toPoint())
+			else:
+				self.viewport().setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+				self._clear_link_style()
+				self._hover_timer.stop()
+				QToolTip.hideText()
+		else:
+			self.viewport().setCursor(QCursor(Qt.CursorShape.IBeamCursor))
+			self._clear_link_style()
+			self._hover_timer.stop()
+			self._last_hover_word = None
+			QToolTip.hideText()
+		super().mouseMoveEvent(event)
+	
+	def _apply_link_style(self, cursor):
+		"""リンクスタイル（青文字+下線）を適用"""
+		selection = QTextEdit.ExtraSelection()
+		selection.format.setForeground(QColor("#4FC1FF"))  # 青色
+		selection.format.setFontUnderline(True)
+		selection.cursor = cursor
+		self._hover_link_selection = selection
+		self.highlight_current_line()
+	
+	def _clear_link_style(self):
+		"""リンクスタイルをクリア"""
+		if self._hover_link_selection:
+			self._hover_link_selection = None
+			self.highlight_current_line()
+	
+	def leaveEvent(self, event):
+		"""エディタからマウスが離れた時"""
+		self._hover_timer.stop()
+		self._last_hover_word = None
+		self._clear_link_style()
+		QToolTip.hideText()
+		super().leaveEvent(event)
+	
+	def _schedule_hover_tooltip(self, global_pos):
+		"""ホバーツールチップの表示をスケジュール"""
+		local_pos = self.viewport().mapFromGlobal(global_pos)
+		cursor = self.cursorForPosition(local_pos)
+		cursor.select(cursor.SelectionType.WordUnderCursor)
+		word = cursor.selectedText()
+		
+		# 単語が変わった場合のみ処理
+		if word != self._last_hover_word:
+			self._last_hover_word = word
+			self._hover_timer.stop()
+			QToolTip.hideText()
+			
+			if word and word.isidentifier():
+				self._hover_global_pos = global_pos
+				self._hover_timer.start(500)  # 500ms後に表示
+	
+	def _show_hover_tooltip(self):
+		"""ホバーツールチップを表示"""
+		if not hasattr(self, '_hover_global_pos') or not self._hover_global_pos:
+			return
+		
+		local_pos = self.viewport().mapFromGlobal(self._hover_global_pos)
+		cursor = self.cursorForPosition(local_pos)
+		cursor.select(cursor.SelectionType.WordUnderCursor)
+		word = cursor.selectedText()
+		
+		if not word or not word.isidentifier():
+			return
+		
+		# シンボル情報を取得
+		from Semantic import get_symbol_info, get_import_info
+		
+		text = self.document().toPlainText()
+		line = cursor.blockNumber() + 1
+		
+		# まずローカルの定義を検索
+		info = get_symbol_info(text, word, line)
+		
+		# インポートされたシンボルも検索
+		if not info:
+			info = get_import_info(text, word)
+		
+		if info:
+			tooltip_text = info.to_tooltip()
+			QToolTip.showText(self._hover_global_pos, tooltip_text, self.viewport())

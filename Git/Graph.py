@@ -8,27 +8,57 @@ import os
 # ─── スタイル定数 ─────────────────────────────────────────
 _MENU_STYLE = """
 	QMenu {
-		background: #252526; color: #CCCCCC;
-		border: 1px solid #3E3E42; padding: 4px 0;
+		background: #1E1E1E; color: #E0E0E0;
+		border: 1px solid #454545; border-radius: 6px; padding: 6px 0;
 	}
-	QMenu::item { padding: 6px 24px; }
-	QMenu::item:selected { background: #094771; }
-	QMenu::separator { height: 1px; background: #3E3E42; margin: 4px 8px; }
+	QMenu::item { padding: 8px 28px; border-radius: 4px; margin: 2px 6px; }
+	QMenu::item:selected { background: #0E639C; }
+	QMenu::separator { height: 1px; background: #454545; margin: 6px 12px; }
 """
-_TOOLBAR_STYLE = "background: #2D2D30; padding: 5px;"
+_TOOLBAR_STYLE = """
+	background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+		stop:0 #323233, stop:1 #2D2D30);
+	border-bottom: 1px solid #1E1E1E; padding: 6px;
+"""
 _SEARCH_STYLE = """
 	QLineEdit {
-		background: #252526; color: #CCCCCC;
-		border: 1px solid #3E3E42; border-radius: 3px; padding: 4px 8px;
+		background: #1E1E1E; color: #E0E0E0;
+		border: 1px solid #3E3E42; border-radius: 6px; padding: 6px 12px;
+		font-size: 11px;
 	}
-	QLineEdit:focus { border-color: #007ACC; }
+	QLineEdit:focus { border-color: #0E639C; background: #252526; }
+"""
+_COMBO_STYLE = """
+	QComboBox {
+		background: #3C3C3C; color: #E0E0E0;
+		border: 1px solid #4A4A4A; border-radius: 4px;
+		padding: 4px 8px; min-height: 22px;
+	}
+	QComboBox:hover { border-color: #0E639C; background: #454545; }
+	QComboBox::drop-down {
+		border: none; width: 20px;
+	}
+	QComboBox::down-arrow { image: none; border: none; }
+	QComboBox QAbstractItemView {
+		background: #1E1E1E; color: #E0E0E0;
+		border: 1px solid #454545; selection-background-color: #0E639C;
+	}
+"""
+_BUTTON_STYLE = """
+	QPushButton {
+		background: #0E639C; color: white;
+		border: none; border-radius: 4px;
+		font-size: 12px; font-weight: bold;
+	}
+	QPushButton:hover { background: #1177BB; }
+	QPushButton:pressed { background: #094771; }
 """
 
 
 class CommitItem:
 	"""コミット情報を保持するデータクラス"""
 	__slots__ = ('hash', 'parents', 'message', 'author', 'date', 'refs',
-				 'branch', 'color_index', 'visible')
+				 'branch', 'color_index', 'visible', 'branch_name')
 
 	def __init__(self, hash, parents, message, author, date, refs):
 		self.hash = hash
@@ -40,6 +70,7 @@ class CommitItem:
 		self.branch = 0
 		self.color_index = 0
 		self.visible = True
+		self.branch_name = None  # ブランチ名を追跡
 
 
 class CompactGraphWidget(QWidget):
@@ -47,20 +78,32 @@ class CompactGraphWidget(QWidget):
 	commitSelected = Signal(CommitItem)
 	fileClicked = Signal(str, str, CommitItem)
 
-	# カラーパレット
+	# カラーパレット (より洗練された配色)
 	COLORS = [
-		QColor("#66D9EF"), QColor("#A6E22E"), QColor("#F92672"),
-		QColor("#FD971F"), QColor("#AE81FF"), QColor("#E6DB74"),
-		QColor("#56B6C2"), QColor("#C678DD"),
+		QColor("#61AFEF"), QColor("#98C379"), QColor("#E06C75"),
+		QColor("#D19A66"), QColor("#C678DD"), QColor("#E5C07B"),
+		QColor("#56B6C2"), QColor("#BE5046"), QColor("#61AFEF").lighter(130),
 	]
+
+	# 主要ブランチの固定色
+	BRANCH_COLORS = {
+		'main': QColor("#98C379"),       # 緑
+		'master': QColor("#98C379"),     # 緑
+		'dev': QColor("#61AFEF"),        # 青
+		'develop': QColor("#61AFEF"),    # 青
+		'feature': QColor("#C678DD"),    # 紫
+		'hotfix': QColor("#E06C75"),     # 赤
+		'bugfix': QColor("#E06C75"),     # 赤
+		'release': QColor("#E5C07B"),    # 黄
+	}
 
 	def __init__(self, parent=None):
 		super().__init__(parent)
 		self.all_commits = []
 		self.commits = []       # フィルタ後の表示用
-		self.row_height = 32
-		self.branch_width = 20
-		self.node_size = 6
+		self.row_height = 36    # 少し余裕を持たせる
+		self.branch_width = 22
+		self.node_size = 7      # より見やすく
 		self.current_branch_head = None
 
 		self.detail_height = 0
@@ -69,8 +112,10 @@ class CompactGraphWidget(QWidget):
 		self.file_rects = []
 		self.selected = None
 		self.hover_commit = None
+		self.hover_file_index = -1
 
 		self.branch_map = {}
+		self.branch_color_map = {}  # ブランチ名→色のマッピング
 		self.setMinimumHeight(50)
 		self.setMouseTracking(True)
 
@@ -118,10 +163,21 @@ class CompactGraphWidget(QWidget):
 		self.setFixedHeight(max(total, 50))
 
 	def _calculateBranches(self):
-		"""ブランチレーンを安定的に計算"""
+		"""ブランチレーンを安定的に計算し、ブランチ名に基づいて色を割り当て"""
 		self.branch_map.clear()
+		self.branch_color_map.clear()
 		active_lanes = []  # 各レーンが接続中のハッシュ (None = 空き)
-		next_branch = 0
+		lane_branch_names = []  # 各レーンのブランチ名
+		color_counter = 0
+
+		# 最初にrefsからブランチ名を抽出してマッピング
+		hash_to_branch = {}
+		for commit in self.commits:
+			for ref in commit.refs:
+				if not ref.startswith('🏷'):  # タグ以外
+					branch_name = ref.split('/')[-1] if '/' in ref else ref
+					hash_to_branch[commit.hash] = branch_name
+					break
 
 		for commit in self.commits:
 			# このコミットに割り当て済みのレーンを探す
@@ -141,9 +197,25 @@ class CompactGraphWidget(QWidget):
 				if lane < 0:
 					lane = len(active_lanes)
 					active_lanes.append(None)
+					lane_branch_names.append(None)
 
 			commit.branch = lane
-			commit.color_index = lane % len(self.COLORS)
+
+			# ブランチ名を決定
+			if commit.hash in hash_to_branch:
+				branch_name = hash_to_branch[commit.hash]
+				lane_branch_names[lane] = branch_name
+				commit.branch_name = branch_name
+			elif lane < len(lane_branch_names) and lane_branch_names[lane]:
+				commit.branch_name = lane_branch_names[lane]
+			else:
+				commit.branch_name = None
+
+			# ブランチ名に基づいて色を割り当て
+			commit.color_index = self._getBranchColorIndex(commit.branch_name, lane, color_counter)
+			if commit.branch_name and commit.branch_name not in self.branch_color_map:
+				self.branch_color_map[commit.branch_name] = commit.color_index
+				color_counter += 1
 
 			# 親コミットにレーンを予約
 			for j, parent_hash in enumerate(commit.parents):
@@ -156,8 +228,10 @@ class CompactGraphWidget(QWidget):
 					continue
 
 				if j == 0:
-					# 第1親は同じレーン
+					# 第1親は同じレーン（ブランチ名も継承）
 					active_lanes[lane] = parent_hash
+					if commit.branch_name:
+						hash_to_branch[parent_hash] = commit.branch_name
 				else:
 					# マージ元は空きレーンか新規
 					placed = False
@@ -168,6 +242,37 @@ class CompactGraphWidget(QWidget):
 							break
 					if not placed:
 						active_lanes.append(parent_hash)
+						lane_branch_names.append(None)
+
+	def _getBranchColorIndex(self, branch_name, lane, counter):
+		"""ブランチ名に基づいて色インデックスを取得"""
+		if not branch_name:
+			return lane % len(self.COLORS)
+
+		# 既に割り当て済みならそれを使用
+		if branch_name in self.branch_color_map:
+			return self.branch_color_map[branch_name]
+
+		# 主要ブランチは固定色
+		for key, color in self.BRANCH_COLORS.items():
+			if branch_name == key or branch_name.startswith(key + '/') or branch_name.startswith(key + '-'):
+				# 固定色のインデックスを探す
+				for i, c in enumerate(self.COLORS):
+					if c == color:
+						return i
+				# 見つからなければ追加
+				return self.COLORS.index(color) if color in self.COLORS else counter % len(self.COLORS)
+
+		# その他のブランチは順番に割り当て
+		return counter % len(self.COLORS)
+
+	def getBranchColor(self, commit):
+		"""コミットのブランチ色を取得"""
+		if commit.branch_name:
+			for key, color in self.BRANCH_COLORS.items():
+				if commit.branch_name == key or commit.branch_name.startswith(key + '/') or commit.branch_name.startswith(key + '-'):
+					return color
+		return self.COLORS[commit.color_index]
 
 	# ─── 描画 ────────────────────────────────────────────
 	def paintEvent(self, event):
@@ -175,22 +280,23 @@ class CompactGraphWidget(QWidget):
 			return
 		painter = QPainter(self)
 		painter.setRenderHint(QPainter.Antialiasing)
-		painter.fillRect(self.rect(), QColor("#252526"))
+		painter.fillRect(self.rect(), QColor("#1E1E1E"))
 
 		# 背景 (選択 / ホバー)
 		for i, commit in enumerate(self.commits):
 			y = self._commitY(i)
 			if commit == self.selected:
-				painter.fillRect(0, y, self.width(), self.row_height, QColor("#094771"))
+				painter.fillRect(0, y, self.width(), self.row_height, QColor("#0E639C"))
 			elif commit == self.hover_commit:
 				painter.fillRect(0, y, self.width(), self.row_height, QColor("#2A2D2E"))
 
 		# 詳細パネル背景
 		if self.selected_index >= 0 and self.detail_height > 0:
 			dy = self._commitY(self.selected_index) + self.row_height
-			painter.fillRect(0, dy, self.width(), self.detail_height, QColor("#1E1E1E"))
-			painter.setPen(QColor("#3E3E42"))
-			painter.drawRect(0, dy, self.width() - 1, self.detail_height - 1)
+			# グラデーション背景
+			painter.fillRect(0, dy, self.width(), self.detail_height, QColor("#181818"))
+			painter.setPen(QPen(QColor("#0E639C"), 2))
+			painter.drawLine(0, dy, self.width(), dy)
 			self._drawDetail(painter, self.selected, dy)
 
 		# 接続線
@@ -212,133 +318,177 @@ class CompactGraphWidget(QWidget):
 		return index * self.row_height + self.detail_height
 
 	def _drawLine(self, painter, commit, parent, ci, pi):
-		sx = commit.branch * self.branch_width + 20
-		sy = self._commitY(ci) + 15
-		ex = parent.branch * self.branch_width + 20
-		ey = self._commitY(pi) + 15
+		sx = commit.branch * self.branch_width + 24
+		sy = self._commitY(ci) + 18
+		ex = parent.branch * self.branch_width + 24
+		ey = self._commitY(pi) + 18
 
-		color = self.COLORS[commit.color_index]
-		painter.setPen(QPen(color.darker(130), 1.5))
+		color = self.getBranchColor(commit)
+		painter.setPen(QPen(color.darker(110), 2.0, Qt.SolidLine, Qt.RoundCap))
 
 		if commit.branch == parent.branch:
 			painter.drawLine(sx, sy, ex, ey)
 		else:
 			path = QPainterPath()
 			path.moveTo(sx, sy)
-			my = (sy + ey) / 2
-			path.cubicTo(sx, my, ex, my, ex, ey)
+			# より滑らかなカーブ
+			ctrl_y1 = sy + (ey - sy) * 0.4
+			ctrl_y2 = sy + (ey - sy) * 0.6
+			path.cubicTo(sx, ctrl_y1, ex, ctrl_y2, ex, ey)
 			painter.drawPath(path)
 
 	def _drawCommit(self, painter, commit, index, text_x):
-		x = commit.branch * self.branch_width + 20
-		y = self._commitY(index) + 15
-		color = self.COLORS[commit.color_index]
+		x = commit.branch * self.branch_width + 24
+		y = self._commitY(index) + 18
+		color = self.getBranchColor(commit)
 		is_head = self.current_branch_head and commit.hash == self.current_branch_head
+		is_merge = len(commit.parents) > 1
 
 		if is_head:
-			painter.setPen(QPen(color, 2))
-			painter.setBrush(QBrush(QColor("#252526")))
-			painter.drawEllipse(QPoint(x, y), self.node_size + 2, self.node_size + 2)
+			# HEAD: 二重リング
+			painter.setPen(QPen(color, 2.5))
+			painter.setBrush(QBrush(QColor("#1E1E1E")))
+			painter.drawEllipse(QPoint(x, y), self.node_size + 3, self.node_size + 3)
+			painter.setBrush(QBrush(color))
+			painter.drawEllipse(QPoint(x, y), self.node_size - 1, self.node_size - 1)
+		elif is_merge:
+			# マージコミット: ダイアモンド形状
+			painter.setPen(QPen(color.lighter(120), 2))
+			painter.setBrush(QBrush(color.darker(110)))
+			path = QPainterPath()
+			s = self.node_size + 2
+			path.moveTo(x, y - s)
+			path.lineTo(x + s, y)
+			path.lineTo(x, y + s)
+			path.lineTo(x - s, y)
+			path.closeSubpath()
+			painter.drawPath(path)
 		elif commit == self.selected:
-			painter.setPen(QPen(QColor("#FFFFFF"), 2))
+			# 選択状態: 明るいリング
+			painter.setPen(QPen(QColor("#FFFFFF"), 2.5))
 			painter.setBrush(QBrush(color))
 			painter.drawEllipse(QPoint(x, y), self.node_size + 2, self.node_size + 2)
 		elif commit == self.hover_commit:
-			painter.setPen(QPen(color.lighter(150), 1.5))
-			painter.setBrush(QBrush(color.lighter(120)))
+			# ホバー状態: グロー効果
+			painter.setPen(QPen(color.lighter(160), 2))
+			painter.setBrush(QBrush(color.lighter(130)))
 			painter.drawEllipse(QPoint(x, y), self.node_size + 1, self.node_size + 1)
 		else:
-			painter.setPen(QPen(color.darker(120), 1))
+			# 通常ノード
+			painter.setPen(QPen(color.darker(110), 1.5))
 			painter.setBrush(QBrush(color))
 			painter.drawEllipse(QPoint(x, y), self.node_size, self.node_size)
 
 		# ハッシュ
-		painter.setPen(QColor("#858585"))
-		painter.setFont(QFont("Consolas", 8))
-		painter.drawText(text_x, y + 4, commit.hash[:7])
+		painter.setPen(QColor("#808080"))
+		painter.setFont(QFont("Consolas", 9))
+		painter.drawText(text_x, y + 5, commit.hash[:7])
 
-		# メッセージ
-		painter.setPen(QColor("#CCCCCC"))
+		# メッセージ (レスポンシブ幅)
+		painter.setPen(QColor("#E0E0E0") if commit == self.selected else QColor("#D4D4D4"))
 		painter.setFont(QFont("Yu Gothic UI", 9))
-		avail = self.width() - text_x - 300
-		max_chars = max(20, avail // 7)
-		msg = commit.message[:max_chars] + "..." if len(commit.message) > max_chars else commit.message
-		painter.drawText(text_x + 60, y + 4, msg)
+		msg_start = text_x + 65
+		avail = self.width() - msg_start - 200
+		max_chars = max(15, avail // 8)
+		msg = commit.message[:max_chars] + "…" if len(commit.message) > max_chars else commit.message
+		painter.drawText(msg_start, y + 5, msg)
 
-		# refs
+		# refs (バッジ表示)
 		if commit.refs:
-			ref_x = text_x + 60 + len(msg) * 8 + 10
+			ref_x = msg_start + min(len(msg), max_chars) * 8 + 16
 			for ref in commit.refs[:3]:
-				# バッジ描画
 				font = QFont("Yu Gothic UI", 8, QFont.Bold)
 				painter.setFont(font)
 				fm = painter.fontMetrics()
-				tw = fm.horizontalAdvance(ref) + 12
-				badge_rect = QRect(ref_x, y - 8, tw, 16)
+				tw = fm.horizontalAdvance(ref) + 14
+				badge_rect = QRect(ref_x, y - 9, tw, 18)
 
 				if ref.startswith('🏷'):
-					bg = QColor("#3E3E42")
-					fg = QColor("#E6DB74")
+					bg = QColor("#4A4A2A")
+					fg = QColor("#E5C07B")
+					border = QColor("#6B6B3C")
 				else:
 					bg = QColor("#1B3A4B")
-					fg = QColor("#4EC9B0")
+					fg = QColor("#61AFEF")
+					border = QColor("#2D5A6B")
 
-				painter.setPen(Qt.NoPen)
+				painter.setPen(QPen(border, 1))
 				painter.setBrush(QBrush(bg))
-				painter.drawRoundedRect(badge_rect, 3, 3)
+				painter.drawRoundedRect(badge_rect, 4, 4)
 				painter.setPen(fg)
 				painter.drawText(badge_rect, Qt.AlignCenter, ref)
-				ref_x += tw + 4
+				ref_x += tw + 5
 
 		# 作者 + 日付 (右端)
-		painter.setPen(QColor("#6A6A6A"))
+		painter.setPen(QColor("#707070"))
 		painter.setFont(QFont("Yu Gothic UI", 8))
-		info = f"{commit.author}  {commit.date}"
-		iw = painter.fontMetrics().horizontalAdvance(info) + 12
-		painter.drawText(self.width() - iw, y + 4, info)
+		info = f"{commit.author}  •  {commit.date}"
+		iw = painter.fontMetrics().horizontalAdvance(info) + 16
+		painter.drawText(self.width() - iw, y + 5, info)
 
 	def _drawDetail(self, painter, commit, y):
 		if not commit:
 			return
 		self.file_rects.clear()
-		font_mono = QFont("Consolas", 8)
+		font_mono = QFont("Consolas", 9)
 		font_ui = QFont("Yu Gothic UI", 9)
+		font_ui_bold = QFont("Yu Gothic UI", 9, QFont.Bold)
 
-		cy = y + 15
+		cy = y + 20
+		# コミット情報セクション
 		painter.setFont(font_mono)
-		painter.setPen(QColor("#569CD6"))
-		painter.drawText(20, cy, f"COMMIT  {commit.hash}")
-		cy += 18
-		painter.setPen(QColor("#CCCCCC"))
-		painter.drawText(20, cy, f"AUTHOR  {commit.author}")
-		cy += 18
-		painter.drawText(20, cy, f"DATE    {commit.date}")
-		cy += 18
+		painter.setPen(QColor("#61AFEF"))
+		painter.drawText(24, cy, "󰜘")  # commit icon alternative
+		painter.setPen(QColor("#808080"))
+		painter.drawText(44, cy, "COMMIT")
+		painter.setPen(QColor("#E0E0E0"))
+		painter.drawText(110, cy, commit.hash)
+		cy += 22
 
-		painter.setPen(QColor("#D4D4D4"))
+		painter.setPen(QColor("#808080"))
+		painter.drawText(44, cy, "AUTHOR")
+		painter.setPen(QColor("#C678DD"))
+		painter.drawText(110, cy, commit.author)
+		cy += 22
+
+		painter.setPen(QColor("#808080"))
+		painter.drawText(44, cy, "DATE")
+		painter.setPen(QColor("#98C379"))
+		painter.drawText(110, cy, commit.date)
+		cy += 24
+
+		# メッセージ
+		painter.setPen(QColor("#E0E0E0"))
 		painter.setFont(font_ui)
-		lines = [commit.message[i:i+90] for i in range(0, len(commit.message), 90)]
+		lines = [commit.message[i:i+100] for i in range(0, len(commit.message), 100)]
 		for line in lines[:3]:
-			painter.drawText(20, cy, line)
-			cy += 16
-
-		if self.selected_commit_files:
-			cy += 8
-			painter.setPen(QColor("#4EC9B0"))
-			painter.setFont(QFont("Yu Gothic UI", 9, QFont.Bold))
-			painter.drawText(20, cy, f"変更ファイル ({len(self.selected_commit_files)})")
+			painter.drawText(24, cy, line)
 			cy += 18
 
-			painter.setFont(font_mono)
-			for fp, st in self.selected_commit_files:
-				fr = QRect(30, cy - 12, self.width() - 40, 16)
-				if fr.contains(self.mapFromGlobal(self.cursor().pos())):
-					painter.fillRect(fr, QColor("#2A2D2E"))
+		# 変更ファイルセクション
+		if self.selected_commit_files:
+			cy += 12
+			painter.setPen(QColor("#61AFEF"))
+			painter.setFont(font_ui_bold)
+			painter.drawText(24, cy, f"📁 変更ファイル ({len(self.selected_commit_files)})")
+			cy += 22
 
-				painter.setPen(QColor(get_status_color(st)))
+			painter.setFont(font_mono)
+			for idx, (fp, st) in enumerate(self.selected_commit_files):
+				fr = QRect(24, cy - 13, self.width() - 48, 20)
+
+				# ホバー状態の描画
+				is_hover = idx == self.hover_file_index
+				if is_hover:
+					painter.fillRect(fr, QColor("#2A2D2E"))
+					painter.setPen(QColor("#0E639C"))
+					painter.drawRect(fr.adjusted(0, 0, -1, -1))
+
+				status_color = get_status_color(st)
+				painter.setPen(QColor(status_color))
 				painter.drawText(40, cy, f"{get_status_icon(st)} {fp}")
 				self.file_rects.append((fr, fp, st))
-				cy += 16
+				cy += 20
 
 	# ─── マウスイベント ───────────────────────────────────
 	def mousePressEvent(self, event):
@@ -363,8 +513,17 @@ class CompactGraphWidget(QWidget):
 
 	def mouseMoveEvent(self, event):
 		old = self.hover_commit
+		old_file = self.hover_file_index
 		self.hover_commit = None
-		over_file = any(r.contains(event.pos()) for r, _, _ in self.file_rects)
+		self.hover_file_index = -1
+		over_file = False
+
+		for idx, (r, _, _) in enumerate(self.file_rects):
+			if r.contains(event.pos()):
+				self.hover_file_index = idx
+				over_file = True
+				break
+
 		self.setCursor(Qt.PointingHandCursor if over_file else Qt.ArrowCursor)
 
 		for i, commit in enumerate(self.commits):
@@ -372,7 +531,7 @@ class CompactGraphWidget(QWidget):
 			if ys <= event.pos().y() < ys + self.row_height:
 				self.hover_commit = commit
 				break
-		if old != self.hover_commit:
+		if old != self.hover_commit or old_file != self.hover_file_index:
 			self.update()
 
 	def contextMenuEvent(self, event):
@@ -423,8 +582,8 @@ class CompactGraphWidget(QWidget):
 	def setCommitFiles(self, files):
 		self.selected_commit_files = files
 		if self.selected_index >= 0:
-			base = 145
-			fh = len(files) * 16
+			base = 160  # より余裕を持たせた基本高さ
+			fh = len(files) * 20
 			self.detail_height = base + fh
 			self._updateHeight()
 		self.update()
@@ -436,7 +595,7 @@ class Main(SecondarySideBar):
 		super().__init__()
 		self.name = "GitGraph"
 		self.description = "Compact Git History Graph"
-		self.version = "2.0.0"
+		self.version = "2.1.0"
 		self.win = window
 
 		self.icon_color(f"{window.DIR}/assets/gitgraph.svg")
@@ -452,28 +611,32 @@ class Main(SecondarySideBar):
 		toolbar = QWidget()
 		toolbar.setStyleSheet(_TOOLBAR_STYLE)
 		tb_layout = QHBoxLayout()
-		tb_layout.setContentsMargins(8, 4, 8, 4)
+		tb_layout.setContentsMargins(10, 6, 10, 6)
+		tb_layout.setSpacing(8)
 
-		title = QLabel("Git履歴")
-		title.setStyleSheet("color: #CCCCCC; font-weight: bold; font-size: 11px;")
+		title = QLabel("󰜘 Git履歴")
+		title.setStyleSheet("color: #E0E0E0; font-weight: bold; font-size: 12px;")
 		tb_layout.addWidget(title)
 		tb_layout.addStretch()
 
 		self.limit_combo = QComboBox()
+		self.limit_combo.setStyleSheet(_COMBO_STYLE)
 		self.limit_combo.addItems(["20", "50", "100", "200", "500", "全て"])
 		self.limit_combo.setCurrentText("50")
-		self.limit_combo.setFixedWidth(70)
+		self.limit_combo.setFixedWidth(75)
 		self.limit_combo.currentTextChanged.connect(self.loadGraph)
 		tb_layout.addWidget(self.limit_combo)
 
 		self.branch_combo = QComboBox()
-		self.branch_combo.addItem("全て")
-		self.branch_combo.setFixedWidth(120)
+		self.branch_combo.setStyleSheet(_COMBO_STYLE)
+		self.branch_combo.addItem("全ブランチ")
+		self.branch_combo.setFixedWidth(140)
 		self.branch_combo.currentTextChanged.connect(self.loadGraph)
 		tb_layout.addWidget(self.branch_combo)
 
 		refresh_btn = QPushButton("⟳")
-		refresh_btn.setFixedSize(28, 28)
+		refresh_btn.setStyleSheet(_BUTTON_STYLE)
+		refresh_btn.setFixedSize(32, 28)
 		refresh_btn.setToolTip("更新")
 		refresh_btn.clicked.connect(self.loadGraph)
 		tb_layout.addWidget(refresh_btn)
@@ -482,17 +645,35 @@ class Main(SecondarySideBar):
 		layout.addWidget(toolbar)
 
 		# ═══ 検索バー ═══
+		search_container = QWidget()
+		search_container.setStyleSheet("background: #252526; padding: 0;")
+		search_layout = QHBoxLayout()
+		search_layout.setContentsMargins(10, 6, 10, 6)
+
 		self.search_input = QLineEdit()
-		self.search_input.setPlaceholderText("🔍 コミット/作者/ハッシュで検索...")
+		self.search_input.setPlaceholderText("🔍 コミット / 作者 / ハッシュで検索...")
 		self.search_input.setStyleSheet(_SEARCH_STYLE)
-		self.search_input.setFixedHeight(28)
+		self.search_input.setFixedHeight(32)
 		self.search_input.textChanged.connect(self._onSearchChanged)
-		layout.addWidget(self.search_input)
+		search_layout.addWidget(self.search_input)
+
+		search_container.setLayout(search_layout)
+		layout.addWidget(search_container)
 
 		# ═══ グラフエリア ═══
 		scroll = QScrollArea()
 		scroll.setWidgetResizable(True)
-		scroll.setStyleSheet("QScrollArea { border: none; background: #252526; }")
+		scroll.setStyleSheet("""
+			QScrollArea { border: none; background: #1E1E1E; }
+			QScrollBar:vertical {
+				background: #1E1E1E; width: 10px; margin: 0;
+			}
+			QScrollBar::handle:vertical {
+				background: #3E3E42; min-height: 30px; border-radius: 5px;
+			}
+			QScrollBar::handle:vertical:hover { background: #4E4E52; }
+			QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+		""")
 
 		self.graph = CompactGraphWidget()
 		self.graph.commitSelected.connect(self.showDetails)
@@ -502,7 +683,11 @@ class Main(SecondarySideBar):
 
 		# ═══ ステータスバー ═══
 		self.status = QLabel("準備完了")
-		self.status.setStyleSheet("background: #007ACC; color: white; padding: 4px 8px; font-size: 9px;")
+		self.status.setStyleSheet("""
+			background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+				stop:0 #0E639C, stop:1 #0A4E7A);
+			color: white; padding: 5px 10px; font-size: 10px; font-weight: bold;
+		""")
 		layout.addWidget(self.status)
 
 		self.setLayout(layout)
@@ -633,7 +818,7 @@ class Main(SecondarySideBar):
 		self.branch_combo.blockSignals(True)
 		current = self.branch_combo.currentText()
 		self.branch_combo.clear()
-		self.branch_combo.addItem("全て")
+		self.branch_combo.addItem("全ブランチ")
 
 		local_branches = []
 		remote_branches = []
