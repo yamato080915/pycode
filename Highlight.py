@@ -34,8 +34,11 @@ class Tokenizer(QObject):
 		for key in modules.keys():
 			file = get_module_file(key)
 			if file:
-				with open(file, 'r', encoding='utf-8', errors='ignore') as f:
-					modulefiles[key] = Semantic(f.read())
+				try:
+					with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+						modulefiles[key] = Semantic(f.read())
+				except Exception as e:
+					print(f"Error loading module {key} from {file}: {e}")
 		index = 0
 		for token, value in tokens:
 			if value in (')', '}', ']') and token == Punctuation:
