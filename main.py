@@ -342,7 +342,7 @@ class Window(QMainWindow):
 			return
 		if not hasattr(current_tab, 'file_path'):
 			return
-		if os.path.splitext(current_tab.file_path)[-1] == ".py":
+		if os.path.splitext(current_tab.file_path)[-1] == ".py" or os.path.splitext(current_tab.file_path)[-1] == ".pyw":
 			self.run_command(f"cd {os.path.dirname(current_tab.file_path)} && {embedded_python} {current_tab.file_path}")
 	
 	def open_file_from_tree(self, index):#ファイルツリーから開く(クリック)
