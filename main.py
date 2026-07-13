@@ -1,4 +1,5 @@
 import sys, os, json, threading, time, subprocess
+from threading import Thread
 from pathlib import Path
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
@@ -17,6 +18,7 @@ from Color import css_color, icon_color
 from pygments.lexers import guess_lexer
 from utils import get_startupinfo, run_subprocess, apply_text_options, reset_highlighter
 from GoToDefinition import go_to_definition
+import Updater
 
 OS = platform.system()
 DIR = os.getcwd()
@@ -342,7 +344,7 @@ class Window(QMainWindow):
 			return
 		if not hasattr(current_tab, 'file_path'):
 			return
-		if os.path.splitext(current_tab.file_path)[-1] == ".py":
+		if os.path.splitext(current_tab.file_path)[-1] == ".py" or os.path.splitext(current_tab.file_path)[-1] == ".pyw":
 			self.run_command(f"cd {os.path.dirname(current_tab.file_path)} && {embedded_python} {current_tab.file_path}")
 	
 	def open_file_from_tree(self, index):#ファイルツリーから開く(クリック)
@@ -452,6 +454,8 @@ class Window(QMainWindow):
 		if can_close:
 			# 設定を保存
 			self.save_settings()
+			if True:
+				Thread(target=Updater.update).start()
 			event.accept()
 		else:
 			event.ignore()
