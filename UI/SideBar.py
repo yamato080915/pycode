@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon
-from Explorer import Explorer
-from Search import Search
+from SideBarViews.Explorer import Explorer
+from SideBarViews.Search import Search
 from Git import Main
 #from main import window as win
 

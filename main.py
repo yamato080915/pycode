@@ -5,13 +5,13 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from Highlight import Highlighter
-from Editor import Editor
-from DiffViewer import DiffViewer
-from ActivityBar import ActivityBar
-from SideBar import SideBar
-from MenuBar import MenuBar
-from TerminalGroup import TerminalGroup
-from SecondarySideBar import SecondarySideBar
+from UI.Editor import Editor
+from UI.DiffViewer import DiffViewer
+from UI.ActivityBar import ActivityBar
+from UI.SideBar import SideBar
+from UI.MenuBar import MenuBar
+from Terminal.Group import TerminalGroup
+from UI.SecondarySideBar import SecondarySideBar
 import platform
 from AddonManager import AddonManager
 from Color import css_color, icon_color
