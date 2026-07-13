@@ -454,7 +454,7 @@ class Window(QMainWindow):
 		if can_close:
 			# 設定を保存
 			self.save_settings()
-			if True:
+			if self.settings.value("autoUpdate", True, type=bool):
 				Thread(target=Updater.update).start()
 			event.accept()
 		else:

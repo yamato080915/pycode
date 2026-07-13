@@ -14,11 +14,12 @@ class ActivityBar(QWidget):
 		self.bar_layout.setContentsMargins(0,0,0,0)
 		self.bar_layout.setSpacing(0)
 
-		self.icons = [("folder.svg", "folder-open.svg"), ("search.svg", "search.svg"), ("git.svg", "git.svg")]
+		self.icons = [("folder.svg", "folder-open.svg"), ("search.svg", "search.svg"), ("git.svg", "git.svg"), ("setting.svg", "setting.svg")]
 	
 		self.explorer_btn = self._create_button("explorer_btn", f"{self.dir}/assets/{self.icons[0][1]}", checked=True)
 		self.search_btn = self._create_button("search_btn", f"{self.dir}/assets/{self.icons[1][0]}")
 		self.git_btn = Button(window).button()
+		self.settings_btn = self._create_button("settings_btn", f"{self.dir}/assets/{self.icons[3][0]}")
 
 		self.bar_layout.addWidget(self.explorer_btn)
 		self.bar_layout.addWidget(self.search_btn)
@@ -30,6 +31,7 @@ class ActivityBar(QWidget):
 			self.bar_layout.addWidget(btn)
 			self.addonbtn.append(btn)
 		self.bar_layout.addStretch()
+		self.bar_layout.addWidget(self.settings_btn)
 
 	def _create_button(self, name, icon_path, checked=False):
 		"""アクティビティバーのボタンを作成"""
