@@ -10,4 +10,4 @@ def check_updates():
 def update():
 	remote, local = check_updates()
 	if remote != local:
-		run_subprocess(["git", "pull", "origin", "main"])
+		run_subprocess(["git", "pull", "origin", "main"], capture_output=True, text=True)
