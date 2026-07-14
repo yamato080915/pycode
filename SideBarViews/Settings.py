@@ -14,6 +14,8 @@ class Settings(QWidget):
 		title.setObjectName("settings_title")
 		layout.addWidget(title)
 
+		layout.addSpacing(10)
+
 		auto_update_label = QLabel("終了時に最新の状態へ自動更新します。")
 		auto_update_label.setWordWrap(True)
 		layout.addWidget(auto_update_label)
@@ -23,7 +25,21 @@ class Settings(QWidget):
 		self.auto_update_checkbox.toggled.connect(self.toggle_auto_update)
 		layout.addWidget(self.auto_update_checkbox)
 
+		layout.addSpacing(10)
+
+		dev_update_label = QLabel("Dev版にアクセス")
+		dev_update_label.setWordWrap(True)
+		layout.addWidget(dev_update_label)
+
+		self.dev_update_checkbox = QCheckBox("Enable Development Version")
+		self.dev_update_checkbox.setChecked(self.win.settings.value("DevUpdate", False, type=bool))
+		self.dev_update_checkbox.toggled.connect(self.toggle_dev_update)
+		layout.addWidget(self.dev_update_checkbox)
+
 		layout.addStretch()
 
 	def toggle_auto_update(self, checked):
 		self.win.settings.setValue("autoUpdate", checked)
+	
+	def toggle_dev_update(self, checked):
+		self.win.settings.setValue("DevUpdate", checked)

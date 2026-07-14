@@ -456,7 +456,7 @@ class Window(QMainWindow):
 			# 設定を保存
 			self.save_settings()
 			if self.settings.value("autoUpdate", True, type=bool):
-				Thread(target=Updater.update).start()
+				Thread(target=Updater.update, args=("main" if not self.settings.value("DevUpdate", False, type=bool) else "dev",)).start()
 			event.accept()
 		else:
 			event.ignore()
