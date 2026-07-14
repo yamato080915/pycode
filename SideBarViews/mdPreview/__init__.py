@@ -1,4 +1,4 @@
-from PreviewBase import PreviewBase
+from SideBarViews.mdPreview.Base import PreviewBase
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIcon, QFont
 from PySide6.QtCore import Qt, QTimer

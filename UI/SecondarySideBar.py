@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QTabWidget
-import mdPreview
+import SideBarViews.mdPreview as mdPreview
 from Git import Graph
 
 class SecondarySideBar(QTabWidget):

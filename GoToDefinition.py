@@ -2,7 +2,7 @@
 import ast
 import os
 import re
-from Semantic import Semantic, SymbolKind, SymbolInfo, get_module_file
+from Highlight.Semantic import Semantic, SymbolKind, SymbolInfo, get_module_file
 
 
 class DefinitionFinder:

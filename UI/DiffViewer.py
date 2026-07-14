@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout
 from PySide6.QtGui import QTextBlockFormat, QColor, QFont
-from Editor import Editor
+from UI.Editor import Editor
 import difflib
 
 class DiffViewer(QWidget):

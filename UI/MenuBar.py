@@ -153,7 +153,7 @@ class MenuBar:
 					rel_path = os.path.relpath(os.path.join(root, file), themes_dir)
 					theme_files.append(rel_path)
 		
-		current_theme = self.window.STYLE if isinstance(self.window.STYLE, str) else "monokai"
+		current_theme = self.window.settings.value("theme", "darkplus")
 		
 		for theme_file in sorted(theme_files):
 			theme_name = os.path.splitext(theme_file)[0]

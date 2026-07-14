@@ -5,13 +5,13 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import QFont, QTextOption, QFontMetrics, QIcon
 from PySide6.QtCore import Qt, QFileInfo, QDir, QSettings
 from Highlight import Highlighter
-from Editor import Editor
-from DiffViewer import DiffViewer
-from ActivityBar import ActivityBar
-from SideBar import SideBar
-from MenuBar import MenuBar
-from TerminalGroup import TerminalGroup
-from SecondarySideBar import SecondarySideBar
+from UI.Editor import Editor
+from UI.DiffViewer import DiffViewer
+from UI.ActivityBar import ActivityBar
+from UI.SideBar import SideBar
+from UI.MenuBar import MenuBar
+from Terminal.Group import TerminalGroup
+from UI.SecondarySideBar import SecondarySideBar
 import platform
 from AddonManager import AddonManager
 from Color import css_color, icon_color
@@ -30,10 +30,11 @@ if OS == "Windows":
 else:
 	embedded_python = f"python3"
 
-def getpyversion():
+def getversions():
 	PYV = run_subprocess([embedded_python, '-V'], capture_output=True, text=True)
-	return PYV.stdout.strip()
-PYV = getpyversion()
+	VERSION = run_subprocess(["git", "show", "--format='%h'", "--no-patch"], capture_output=True, text=True)
+	return PYV.stdout.strip(), VERSION.stdout.strip().strip("'")
+PYV, VERSION = getversions()
 STYLE = "onedarkpro"
 
 def change_theme(theme_name):
@@ -454,8 +455,8 @@ class Window(QMainWindow):
 		if can_close:
 			# 設定を保存
 			self.save_settings()
-			if True:
-				Thread(target=Updater.update).start()
+			if self.settings.value("autoUpdate", True, type=bool):
+				Thread(target=Updater.update, args=("main" if not self.settings.value("DevUpdate", False, type=bool) else "dev",)).start()
 			event.accept()
 		else:
 			event.ignore()

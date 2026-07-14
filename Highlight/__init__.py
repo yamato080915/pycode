@@ -4,7 +4,7 @@ from pygments.lexers import get_lexer_for_filename, get_lexer_by_name
 from pygments.token import Token, Punctuation, Name
 from pygments.util import ClassNotFound
 import json
-from Semantic import *
+from Highlight.Semantic import *
 
 Punctuation.Bracket
 Punctuation.Bracket.Depth0
