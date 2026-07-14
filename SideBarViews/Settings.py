@@ -1,3 +1,4 @@
+import sys
 from PySide6.QtWidgets import *
 
 class Settings(QWidget):
@@ -36,6 +37,25 @@ class Settings(QWidget):
 		self.dev_update_checkbox.toggled.connect(self.toggle_dev_update)
 		layout.addWidget(self.dev_update_checkbox)
 
+		layout.addSpacing(10)
+
+		python_interpreter_label = QLabel("Pythonインタープリター")
+		python_interpreter_label.setWordWrap(True)
+		layout.addWidget(python_interpreter_label)
+
+		interpreter_row = QHBoxLayout()
+		self.python_interpreter_edit = QLineEdit()
+		self.python_interpreter_edit.setReadOnly(True)
+		self.python_interpreter_edit.setPlaceholderText(sys.executable)
+		self.python_interpreter_edit.setText(self.win.settings.value("pythonInterpreter", sys.executable, type=str))
+		interpreter_row.addWidget(self.python_interpreter_edit)
+
+		self.python_interpreter_button = QPushButton("参照")
+		self.python_interpreter_button.clicked.connect(self.choose_python_interpreter)
+		interpreter_row.addWidget(self.python_interpreter_button)
+
+		layout.addLayout(interpreter_row)
+
 		layout.addStretch()
 
 	def toggle_auto_update(self, checked):
@@ -43,3 +63,15 @@ class Settings(QWidget):
 	
 	def toggle_dev_update(self, checked):
 		self.win.settings.setValue("DevUpdate", checked)
+
+	def choose_python_interpreter(self):
+		path, _ = QFileDialog.getOpenFileName(
+			self,
+			"Pythonインタープリターを選択",
+			self.python_interpreter_edit.text() or sys.executable,
+			"実行ファイル (*.exe);;すべてのファイル (*.*)"
+		)
+		if not path:
+			return
+		self.python_interpreter_edit.setText(path)
+		self.win.settings.setValue("pythonInterpreter", path)
