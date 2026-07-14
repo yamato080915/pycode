@@ -30,10 +30,11 @@ if OS == "Windows":
 else:
 	embedded_python = f"python3"
 
-def getpyversion():
+def getversions():
 	PYV = run_subprocess([embedded_python, '-V'], capture_output=True, text=True)
-	return PYV.stdout.strip()
-PYV = getpyversion()
+	VERSION = run_subprocess(["git", "show", "--format='%h'", "--no-patch"], capture_output=True, text=True)
+	return PYV.stdout.strip(), VERSION.stdout.strip().strip("'")
+PYV, VERSION = getversions()
 STYLE = "onedarkpro"
 
 def change_theme(theme_name):
