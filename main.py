@@ -26,12 +26,9 @@ DIR = os.getcwd()
 if OS == "Windows":
 	import ctypes
 	ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pycode2')
-	embedded_python = f"{DIR}/python/python.exe"
-else:
-	embedded_python = f"python3"
 
 def getversions():
-	PYV = run_subprocess([embedded_python, '-V'], capture_output=True, text=True)
+	PYV = run_subprocess([sys.executable, '-V'], capture_output=True, text=True)
 	VERSION = run_subprocess(["git", "show", "--format='%h'", "--no-patch"], capture_output=True, text=True)
 	return PYV.stdout.strip(), VERSION.stdout.strip().strip("'")
 PYV, VERSION = getversions()
@@ -346,7 +343,8 @@ class Window(QMainWindow):
 		if not hasattr(current_tab, 'file_path'):
 			return
 		if os.path.splitext(current_tab.file_path)[-1] == ".py" or os.path.splitext(current_tab.file_path)[-1] == ".pyw":
-			self.run_command(f"cd {os.path.dirname(current_tab.file_path)} && {embedded_python} {current_tab.file_path}")
+			python_interpreter = self.settings.value("pythonInterpreter", sys.executable, type=str)
+			self.run_command(f"cd {os.path.dirname(current_tab.file_path)} && {python_interpreter} {current_tab.file_path}")
 	
 	def open_file_from_tree(self, index):#ファイルツリーから開く(クリック)
 		file_path = self.sidebar.explorer.file_model.filePath(index)
