@@ -1,5 +1,6 @@
 import sys
 from PySide6.QtWidgets import *
+from utils import run_subprocess
 
 class Settings(QWidget):
 	def __init__(self, window=None):
@@ -63,6 +64,10 @@ class Settings(QWidget):
 	
 	def toggle_dev_update(self, checked):
 		self.win.settings.setValue("DevUpdate", checked)
+		if checked:
+			run_subprocess(["git", "switch", "dev"], capture_output=True, text=True)
+		else:
+			run_subprocess(["git", "switch", "main"], capture_output=True, text=True)
 
 	def choose_python_interpreter(self):
 		path, _ = QFileDialog.getOpenFileName(
