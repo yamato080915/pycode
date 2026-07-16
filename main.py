@@ -12,7 +12,7 @@ from UI.SideBar import SideBar
 from UI.MenuBar import MenuBar
 from Terminal.Group import TerminalGroup
 from UI.SecondarySideBar import SecondarySideBar
-import platform
+import platform, requests
 from AddonManager import AddonManager
 from Color import css_color, icon_color
 from pygments.lexers import guess_lexer
@@ -29,9 +29,21 @@ if OS == "Windows":
 
 def getversions():
 	PYV = run_subprocess([sys.executable, '-V'], capture_output=True, text=True)
-	VERSION = run_subprocess(["git", "show", "--format='%h'", "--no-patch"], capture_output=True, text=True)
-	return PYV.stdout.strip(), VERSION.stdout.strip().strip("'")
-PYV, VERSION = getversions()
+	COMMIT = run_subprocess(["git", "show", "--format='%H'", "--no-patch"], capture_output=True, text=True)
+	return PYV.stdout.strip(), COMMIT.stdout.strip().strip("'")
+
+def getversion(commit):
+	global VERSION
+	response = requests.get("https://yamato080915.github.io/pycode/versions.json")
+	data = response.json()
+	if commit in data:
+		VERSION = data[commit]
+	else:
+		VERSION = "DEV"
+
+PYV, COMMIT = getversions()
+threading.Thread(target=getversion, args=(COMMIT,), name="getversion").start()
+
 STYLE = "onedarkpro"
 
 def change_theme(theme_name):
@@ -130,6 +142,9 @@ class Window(QMainWindow):
 		self.create_status_bar()
 		
 		self.newtab(name="Untitled")
+
+	def version(self):
+		return COMMIT, VERSION
 
 	def create_status_bar(self):
 		self.status_bar = self.statusBar()

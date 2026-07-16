@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QAction, QActionGroup
+from PySide6.QtCore import Qt
 import os
 from GoToDefinition import go_to_definition
 #from main import window as win
@@ -12,6 +13,7 @@ class MenuBar:
 		self.editmenu()
 		self.runmenu()
 		self.viewmenu()
+		self.helpmenu()
 	
 	def filemenu(self):
 		self.file_menu = self.menubar.addMenu("ファイル(&F)")
@@ -182,3 +184,21 @@ class MenuBar:
 		self.run_menu.addAction(run_action)
 		self.run_menu.addSeparator()
 		self.run_menu.addAction(new_terminal_action)
+	
+	def helpmenu(self):
+		self.help_menu = self.menubar.addMenu("ヘルプ(&H)")
+		self.help_menu.setFont(self.window.FONT)
+
+		about_action = QAction("バージョン情報", self.window)
+		about_action.triggered.connect(self.about_dialog)
+
+		self.help_menu.addAction(about_action)
+	
+	def about_dialog(self):
+		COMMIT, VERSION = self.window.version()
+
+		QMessageBox.about(
+			self.window, 
+			"PyCode2", 
+			f"PyCode2\n\nバージョン: {VERSION}\nコミット: {COMMIT}"
+		)
