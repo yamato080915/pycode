@@ -21,7 +21,7 @@ from GoToDefinition import go_to_definition
 import Updater
 
 OS = platform.system()
-DIR = os.getcwd()
+DIR = os.path.dirname(os.path.abspath(__file__))
 
 if OS == "Windows":
 	import ctypes
