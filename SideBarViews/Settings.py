@@ -65,9 +65,9 @@ class Settings(QWidget):
 	def toggle_dev_update(self, checked):
 		self.win.settings.setValue("DevUpdate", checked)
 		if checked:
-			run_subprocess(["git", "switch", "dev"], capture_output=True, text=True)
+			run_subprocess(["git", "switch", "dev"], capture_output=True, text=True, cwd=self.win.DIR)
 		else:
-			run_subprocess(["git", "switch", "main"], capture_output=True, text=True)
+			run_subprocess(["git", "switch", "main"], capture_output=True, text=True, cwd=self.win.DIR)
 
 	def choose_python_interpreter(self):
 		path, _ = QFileDialog.getOpenFileName(
