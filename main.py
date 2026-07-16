@@ -458,6 +458,7 @@ class Window(QMainWindow):
 			self.settings.setValue("workspace", current_folder)
 	
 	def closeEvent(self, event):#終了前処理など
+		global th
 		can_close = True
 		for i in range(len(self.tablist)):
 			if not hasattr(self.tablist[i], "textCursor"):
@@ -469,7 +470,8 @@ class Window(QMainWindow):
 			# 設定を保存
 			self.save_settings()
 			if self.settings.value("autoUpdate", True, type=bool):
-				Thread(target=Updater.update, args=("main" if not self.settings.value("DevUpdate", False, type=bool) else "dev",)).start()
+				th = Thread(target=Updater.update, args=("main" if not self.settings.value("DevUpdate", False, type=bool) else "dev",))
+				th.start()
 			event.accept()
 		else:
 			event.ignore()
@@ -490,4 +492,9 @@ if __name__ == "__main__":
 	app = QApplication(sys.argv)
 	window = Window()
 	window.showMaximized()
-	sys.exit(app.exec())
+	try:
+		app.exec()
+	except Exception as e:
+		print(e.__class__, e)
+	finally:
+		th.join()
